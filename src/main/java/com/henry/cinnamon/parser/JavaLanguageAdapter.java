@@ -1,10 +1,12 @@
 package com.henry.cinnamon.parser;
 
 
+import org.springframework.stereotype.Component;
 import org.treesitter.TSLanguage;
 import org.treesitter.TSNode;
 import org.treesitter.TreeSitterJava;
 
+@Component
 public class JavaLanguageAdapter implements LanguageAdapter{
 
     @Override
