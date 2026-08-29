@@ -22,3 +22,26 @@ spring:
       transformer:
         onnx:
           model-name: all-MiniLM-L6-v2
+
+
+
+
+    mcp:
+      server:
+        name: cinnamon
+        version: 1.0.0
+        protocol: STREAMABLE
+
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
