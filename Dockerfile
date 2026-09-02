@@ -8,7 +8,7 @@ RUN mkdir -p /app/onnx && \
     curl -L -o /app/onnx/model.onnx https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model_quantized.onnx && \
     apt-get remove -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
-# Copy the pre-built application JAR
+
 COPY target/cinnamon-*.jar app.jar
 
 # Point Spring AI to the pre-bundled local files
