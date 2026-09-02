@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class FunctionExtractor {
@@ -27,33 +28,55 @@ public class FunctionExtractor {
 
     /**
      * Extracts all functions/methods from a source code file.
+     * Gracefully returns an empty list if file extension is unsupported (e.g., .md, .json, .yml).
      */
     public List<CodeUnit> extractFunctions(String sourceCode, String filePath, String repository) {
-        LanguageAdapter lang = registry.forFile(filePath)
-                .orElseThrow(() -> new IllegalArgumentException("Unsupported file type for path: " + filePath));
+        if (sourceCode == null || sourceCode.isBlank() || filePath == null) {
+            return List.of();
+        }
 
-        TSParser parser = new TSParser();
-        parser.setLanguage(lang.treeSitterLanguage());
-        TSTree tree = parser.parseString(null, sourceCode);
+        Optional<LanguageAdapter> langOpt = registry.forFile(filePath);
+        if (langOpt.isEmpty()) {
+            return List.of(); // Safely skip unsupported file types without throwing exceptions
+        }
 
-        List<CodeUnit> units = new ArrayList<>();
-        walk(tree.getRootNode(), sourceCode, filePath, repository, lang, units);
-        return units;
+        LanguageAdapter lang = langOpt.get();
+
+        try {
+            TSParser parser = new TSParser();
+            parser.setLanguage(lang.treeSitterLanguage());
+            TSTree tree = parser.parseString(null, sourceCode);
+            if (tree == null || tree.getRootNode() == null) {
+                return List.of();
+            }
+
+            List<CodeUnit> units = new ArrayList<>();
+            walk(tree.getRootNode(), sourceCode, filePath, repository, lang, units);
+            return units;
+        } catch (Exception e) {
+            // Guard against any malformed AST syntax error
+            return List.of();
+        }
     }
 
     /**
      * Extracts a single function probe from a standalone code snippet.
+     * Returns Optional.empty() if no function syntax is detected.
      */
-    public CodeUnit extractSingle(String sourceCode, String filePath, String repository) {
-        List<CodeUnit> units = extractFunctions(sourceCode, filePath, repository);
+    public Optional<CodeUnit> extractSingle(String sourceCode, String filePath, String repository) {
+        List<CodeUnit> units = extractFunctions(sourceCode, filePath != null ? filePath : "snippet.java", repository);
         if (units.isEmpty()) {
-            throw new IllegalArgumentException("No function/method found in the provided snippet for: " + filePath);
+            return Optional.empty();
         }
-        return units.get(0);
+        return Optional.of(units.get(0));
     }
 
     private void walk(TSNode node, String source, String filePath, String repository,
                       LanguageAdapter lang, List<CodeUnit> units) {
+        if (node == null || node.isNull()) {
+            return;
+        }
+
         if (lang.isFunctionNode(node)) {
             String normalizedText = normalizer.normalize(node, source, lang);
 
@@ -75,8 +98,12 @@ public class FunctionExtractor {
     }
 
     private int countLines(String source, TSNode node) {
-        String snippet = source.substring(node.getStartByte(), node.getEndByte());
-        return (int) snippet.lines().count();
+        try {
+            String snippet = source.substring(node.getStartByte(), node.getEndByte());
+            return (int) snippet.lines().count();
+        } catch (Exception e) {
+            return 1;
+        }
     }
 
     private String sha256(String input) {
