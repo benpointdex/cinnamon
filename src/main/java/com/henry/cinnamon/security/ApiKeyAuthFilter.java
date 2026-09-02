@@ -30,8 +30,10 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
         String requestURI = request.getRequestURI();
 
-        // 1. Bypass authentication for public signup/verification and actuator endpoints
-        if (requestURI.startsWith("/api/tenants") || requestURI.startsWith("/actuator")) {
+        // 1. Bypass authentication for public signup/verification, actuator endpoints, and OPTIONS preflight
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())
+                || requestURI.startsWith("/api/tenants")
+                || requestURI.startsWith("/actuator")) {
             filterChain.doFilter(request, response);
             return;
         }
