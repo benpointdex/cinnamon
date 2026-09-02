@@ -3,36 +3,39 @@ spring:
     name: cinnamon
 
   datasource:
-    url:
-      jdbc:postgresql://localhost:5432/${DB_NAME}
-    username: ${DB_USER}
-    password: ${DB_PASSWORD}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/${DB_NAME:cinnamon_db}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USER:postgres}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:root123}}
+    hikari:
+      maximum-pool-size: 3 # default is 10 — saves connection RAM on free tier
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
 
   ai:
-    google:
-      genai:
-        api-key: ${GEMINI_API_KEY}
-
-
-
-
+    # 1. Local In-Process ONNX Transformer Embedding (384 dimensions, zero API key)
     model:
       embedding: transformers
     embedding:
       transformer:
         onnx:
           model-name: all-MiniLM-L6-v2
+          model-uri: ${SPRING_AI_EMBEDDING_TRANSFORMER_ONNX_MODEL_URI:https://media.githubusercontent.com/media/spring-projects/spring-ai/refs/heads/main/models/spring-ai-transformers/src/main/resources/onnx/all-MiniLM-L6-v2/model.onnx}
+        tokenizer:
+          uri: ${SPRING_AI_EMBEDDING_TRANSFORMER_TOKENIZER_URI:https://raw.githubusercontent.com/spring-projects/spring-ai/main/models/spring-ai-transformers/src/main/resources/onnx/all-MiniLM-L6-v2/tokenizer.json}
 
-
-
-
+    # 2. Spring AI MCP Server Configuration
     mcp:
       server:
-        name: cinnamon
+        name: dejacode
         version: 1.0.0
         protocol: STREAMABLE
 
-
+  # 3. SMTP Email Configuration (with console fallback)
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
@@ -45,3 +48,8 @@ spring:
           starttls:
             enable: true
             required: true
+
+server:
+  tomcat:
+    threads:
+      max: 10 # default is 200 — saves thread stack RAM on free tier
