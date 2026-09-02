@@ -28,6 +28,8 @@ public class TenantService {
 
     @Autowired
     private TenantRepository tenantRepository;
+    @Autowired
+    private EmailService emailService;
 
 
     public TenantCreatedResponse  createTenant (CreateTenantRequest req){
@@ -51,6 +53,7 @@ public class TenantService {
         tenant.setDailyRequestLimit(50);
         tenantRepository.save(tenant);
         log.info("Verification OTP for {}: {}", req.email(), verificationCode);
+        emailService.sendVerificationCode(req.email(), verificationCode);
         return new TenantCreatedResponse(
                 tenant.getTenantId(),
                 rawApiKey,

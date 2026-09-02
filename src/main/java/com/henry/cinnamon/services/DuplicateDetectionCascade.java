@@ -4,6 +4,7 @@ import com.henry.cinnamon.model.CodeUnit;
 import com.henry.cinnamon.model.DetectionResult;
 import com.henry.cinnamon.repository.CodeUnitRepository;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,7 +19,7 @@ public class DuplicateDetectionCascade {
     private final CodeUnitRepository codeUnitRepository;
     private final EmbeddingModel embeddingModel; // In-process ONNX embedding model
 
-    public DuplicateDetectionCascade(CodeUnitRepository codeUnitRepository, EmbeddingModel embeddingModel) {
+    public DuplicateDetectionCascade(CodeUnitRepository codeUnitRepository, @Lazy EmbeddingModel embeddingModel) {
         this.codeUnitRepository = codeUnitRepository;
         this.embeddingModel = embeddingModel;
     }

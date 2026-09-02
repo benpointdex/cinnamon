@@ -9,6 +9,7 @@ import com.henry.cinnamon.repository.IngestionJobRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -31,7 +32,7 @@ public class IngestionJobService {
     public IngestionJobService(FunctionExtractor functionExtractor,
                                CodeUnitRepository codeUnitRepository,
                                IngestionJobRepository jobRepository,
-                               EmbeddingModel embeddingModel) {
+                               @Lazy EmbeddingModel embeddingModel) {
         this.functionExtractor = functionExtractor;
         this.codeUnitRepository = codeUnitRepository;
         this.jobRepository = jobRepository;
