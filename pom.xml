@@ -87,6 +87,20 @@
 			<version>0.23.4</version>
 		</dependency>
 
+		<!-- Tree-sitter TypeScript Grammar -->
+		<dependency>
+			<groupId>io.github.bonede</groupId>
+			<artifactId>tree-sitter-typescript</artifactId>
+			<version>0.23.2</version>
+		</dependency>
+
+		<!-- Tree-sitter JavaScript Grammar -->
+		<dependency>
+			<groupId>io.github.bonede</groupId>
+			<artifactId>tree-sitter-javascript</artifactId>
+			<version>0.23.1</version>
+		</dependency>
+
 
 		<!-- Rate Limiting -->
 		<dependency>

@@ -26,12 +26,21 @@ public class IdentifierNormalizer {
 
     private void collectLocalDeclarations(TSNode node, String source, LanguageAdapter lang,
                                           Map<String, String> table) {
+        if (node == null || node.isNull()) {
+            return;
+        }
+
         if (lang.isLocalDeclaration(node)) {
             TSNode nameNode = node.getChildByFieldName("name");
-            if (nameNode != null) {
+            if (nameNode == null || nameNode.isNull()) {
+                nameNode = node.getChildByFieldName("pattern");
+            }
+            if (nameNode != null && !nameNode.isNull()) {
                 String varName = text(nameNode, source);
-                // Assign incremental placeholder: VAR_1, VAR_2, ...
-                table.putIfAbsent(varName, "VAR_" + (table.size() + 1));
+                if (!varName.isBlank()) {
+                    // Assign incremental placeholder: VAR_1, VAR_2, ...
+                    table.putIfAbsent(varName, "VAR_" + (table.size() + 1));
+                }
             }
         }
 
@@ -42,6 +51,10 @@ public class IdentifierNormalizer {
 
     private void emitNormalized(TSNode node, TSNode functionNode, String source, LanguageAdapter lang,
                                 Map<String, String> table, StringBuilder out) {
+        if (node == null || node.isNull()) {
+            return;
+        }
+
         String nodeType = node.getType();
 
         // 1. Ignore all comment nodes (strips single-line, block, and doc comments)
@@ -55,7 +68,7 @@ public class IdentifierNormalizer {
 
             // If this token is the function's own name, normalize to "FUNC"
             TSNode funcNameNode = functionNode.getChildByFieldName("name");
-            if (funcNameNode != null && node.equals(funcNameNode)) {
+            if (funcNameNode != null && !funcNameNode.isNull() && node.equals(funcNameNode)) {
                 out.append("FUNC").append(' ');
                 return;
             }
@@ -79,6 +92,9 @@ public class IdentifierNormalizer {
     }
 
     private String text(TSNode node, String source) {
+        if (node == null || node.isNull()) {
+            return "";
+        }
         return source.substring(node.getStartByte(), node.getEndByte());
     }
 }

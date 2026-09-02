@@ -5,6 +5,7 @@ import com.henry.cinnamon.parser.FunctionExtractor;
 import com.henry.cinnamon.parser.IdentifierNormalizer;
 import com.henry.cinnamon.parser.JavaLanguageAdapter;
 import com.henry.cinnamon.parser.LanguageAdapterRegistry;
+import com.henry.cinnamon.parser.TypeScriptLanguageAdapter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import java.util.List;
@@ -17,7 +18,8 @@ class FunctionExtractorTest {
     @BeforeEach
     void setUp() {
         JavaLanguageAdapter javaAdapter = new JavaLanguageAdapter();
-        LanguageAdapterRegistry registry = new LanguageAdapterRegistry(List.of(javaAdapter));
+        TypeScriptLanguageAdapter tsAdapter = new TypeScriptLanguageAdapter();
+        LanguageAdapterRegistry registry = new LanguageAdapterRegistry(List.of(javaAdapter, tsAdapter));
         IdentifierNormalizer normalizer = new IdentifierNormalizer();
         functionExtractor = new FunctionExtractor(registry, normalizer);
     }
@@ -54,5 +56,32 @@ class FunctionExtractorTest {
 
         // The SHA-256 hashes must be 100% IDENTICAL!
         assertEquals(unitsA.get(0).getContentHash(), unitsB.get(0).getContentHash());
+    }
+
+    @Test
+    void shouldExtractAndNormalizeTypeScriptFunctions() {
+        String tsCodeA = """
+            // Add two numbers
+            export function add(firstNumber: number, secondNumber: number): number {
+                const totalSum = firstNumber + secondNumber;
+                return totalSum;
+            }
+            """;
+
+        String tsCodeB = """
+            /* Different comment */
+            export const sum = (x: number, y: number): number => {
+                const result = x + y;
+                return result;
+            };
+            """;
+
+        List<CodeUnit> unitsA = functionExtractor.extractFunctions(tsCodeA, "calculator.ts", "my-repo");
+        List<CodeUnit> unitsB = functionExtractor.extractFunctions(tsCodeB, "math.ts", "my-repo");
+
+        assertEquals(1, unitsA.size());
+        assertEquals(1, unitsB.size());
+        assertEquals("add", unitsA.get(0).getFunctionName());
+        assertEquals("sum", unitsB.get(0).getFunctionName());
     }
 }
