@@ -4,6 +4,7 @@ import com.henry.cinnamon.model.CodeUnit;
 import com.henry.cinnamon.model.FileInput;
 import com.henry.cinnamon.model.IngestionJob;
 import com.henry.cinnamon.parser.FunctionExtractor;
+import com.henry.cinnamon.parser.SourceFileFilter;
 import com.henry.cinnamon.repository.CodeUnitRepository;
 import com.henry.cinnamon.repository.IngestionJobRepository;
 import org.slf4j.Logger;
@@ -25,15 +26,18 @@ public class IngestionJobService {
     private static final int BATCH_SIZE = 50;
 
     private final FunctionExtractor functionExtractor;
+    private final SourceFileFilter sourceFileFilter;
     private final CodeUnitRepository codeUnitRepository;
     private final IngestionJobRepository jobRepository;
     private final EmbeddingModel embeddingModel;
 
     public IngestionJobService(FunctionExtractor functionExtractor,
+                               SourceFileFilter sourceFileFilter,
                                CodeUnitRepository codeUnitRepository,
                                IngestionJobRepository jobRepository,
                                @Lazy EmbeddingModel embeddingModel) {
         this.functionExtractor = functionExtractor;
+        this.sourceFileFilter = sourceFileFilter;
         this.codeUnitRepository = codeUnitRepository;
         this.jobRepository = jobRepository;
         this.embeddingModel = embeddingModel;
@@ -78,7 +82,12 @@ public class IngestionJobService {
                 List<CodeUnit> extracted = functionExtractor.extractFunctions(file.content(), file.path(), repository);
 
                 for (CodeUnit unit : extracted) {
-                    // 3. Skip unchanged function if content hash already exists
+                    // 3. Filter out trivial boilerplate (< 5 lines without logic, empty bodies, simple getters/setters)
+                    if (!sourceFileFilter.isMeaningfulFunction(unit.getLineCount(), unit.getNormalizedText())) {
+                        continue;
+                    }
+
+                    // 4. Skip unchanged function if content hash already exists
                     if (codeUnitRepository.existsByTenantIdAndRepositoryAndContentHash(tenantId, repository, unit.getContentHash())) {
                         skippedCount++;
                         continue;
@@ -92,7 +101,7 @@ public class IngestionJobService {
 
                 processedFilesCount++;
 
-                // 4. Batch embed & save in chunks of 50
+                // 5. Batch embed & save in chunks of 50
                 if (pendingBatch.size() >= BATCH_SIZE) {
                     embedAndSaveBatch(pendingBatch);
                     indexedCount += pendingBatch.size();
@@ -104,6 +113,7 @@ public class IngestionJobService {
             if (!pendingBatch.isEmpty()) {
                 embedAndSaveBatch(pendingBatch);
                 indexedCount += pendingBatch.size();
+                pendingBatch.clear();
             }
 
             job.setStatus("COMPLETED");
@@ -120,14 +130,21 @@ public class IngestionJobService {
     }
 
     private void embedAndSaveBatch(List<CodeUnit> units) {
+        if (units == null || units.isEmpty()) {
+            return;
+        }
+
         List<String> normalizedTexts = units.stream()
                 .map(CodeUnit::getNormalizedText)
                 .toList();
 
-        // Batch embed locally using in-process ONNX model
+        // Batch matrix inference via Spring AI ONNX Transformers
+        List<float[]> vectors = embeddingModel.embed(normalizedTexts);
+
         for (int i = 0; i < units.size(); i++) {
-            float[] vector = embeddingModel.embed(normalizedTexts.get(i));
-            units.get(i).setEmbedding(vector);
+            if (i < vectors.size()) {
+                units.get(i).setEmbedding(vectors.get(i));
+            }
         }
 
         // Bulk insert into Postgres

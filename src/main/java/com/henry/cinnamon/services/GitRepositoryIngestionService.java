@@ -161,8 +161,8 @@ public class GitRepositoryIngestionService {
                 List<CodeUnit> extracted = functionExtractor.extractFunctions(content, relativePath, repository);
 
                 for (CodeUnit unit : extracted) {
-                    // Filter out trivial boilerplate (< 5 lines)
-                    if (!sourceFileFilter.isMeaningfulFunction(unit.getLineCount())) {
+                    // Filter out trivial boilerplate (< 5 lines without logic, empty bodies, simple getters/setters)
+                    if (!sourceFileFilter.isMeaningfulFunction(unit.getLineCount(), unit.getNormalizedText())) {
                         continue;
                     }
 
@@ -236,29 +236,25 @@ public class GitRepositoryIngestionService {
     }
 
     private boolean matchesSourceDirs(String relativePath, List<String> sourceDirs) {
-        if (sourceDirs == null || sourceDirs.isEmpty()) {
-            return true;
-        }
-        for (String dir : sourceDirs) {
-            String cleanDir = dir.replace('\\', '/').trim();
-            if (cleanDir.endsWith("/")) {
-                cleanDir = cleanDir.substring(0, cleanDir.length() - 1);
-            }
-            if (relativePath.startsWith(cleanDir + "/") || relativePath.equalsIgnoreCase(cleanDir)) {
-                return true;
-            }
-        }
-        return false;
+        return sourceFileFilter.matchesSourceDirs(relativePath, sourceDirs);
     }
 
     private void embedAndSaveBatch(List<CodeUnit> units) {
+        if (units == null || units.isEmpty()) {
+            return;
+        }
+
         List<String> normalizedTexts = units.stream()
                 .map(CodeUnit::getNormalizedText)
                 .toList();
 
+        // Batched SIMD Matrix inference via Spring AI ONNX Transformers
+        List<float[]> vectors = embeddingModel.embed(normalizedTexts);
+
         for (int i = 0; i < units.size(); i++) {
-            float[] vector = embeddingModel.embed(normalizedTexts.get(i));
-            units.get(i).setEmbedding(vector);
+            if (i < vectors.size()) {
+                units.get(i).setEmbedding(vectors.get(i));
+            }
         }
 
         codeUnitRepository.saveAll(units);
