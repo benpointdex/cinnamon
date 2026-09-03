@@ -185,6 +185,15 @@ public class GitRepositoryIngestionService {
                     embedAndSaveBatch(pendingBatch);
                     indexedFunctions += pendingBatch.size();
                     pendingBatch.clear();
+
+                    // Update live progress in DB
+                    job.setProcessedFiles(processedFiles);
+                    job.setFunctionsIndexed(indexedFunctions);
+                    job.setFunctionsSkippedUnchanged(skippedFunctions);
+                    jobRepository.save(job);
+                } else if (processedFiles % 5 == 0) {
+                    job.setProcessedFiles(processedFiles);
+                    jobRepository.save(job);
                 }
             }
 

@@ -40,7 +40,6 @@ public class DuplicateClusterScanner {
         Map<String, String> parent = new HashMap<>();
         Map<String, DuplicateMember> memberMap = new HashMap<>();
         Map<String, Double> clusterMaxScore = new HashMap<>();
-        Map<String, String> clusterSnippet = new HashMap<>();
 
         for (DuplicatePairProjection p : pairs) {
             String keyA = formatKey(p.getFilePathA(), p.getFunctionNameA());
@@ -53,7 +52,7 @@ public class DuplicateClusterScanner {
             memberMap.putIfAbsent(keyA, new DuplicateMember(p.getFilePathA(), p.getFunctionNameA(), linesA));
             memberMap.putIfAbsent(keyB, new DuplicateMember(p.getFilePathB(), p.getFunctionNameB(), linesB));
 
-            union(parent, clusterMaxScore, clusterSnippet, keyA, keyB, score, p.getSnippetA());
+            union(parent, clusterMaxScore, keyA, keyB, score);
         }
 
         // 2. Group members by their root cluster
@@ -87,20 +86,25 @@ public class DuplicateClusterScanner {
             String severity = roundedScore >= 0.95 ? "CRITICAL_COPY_PASTE"
                     : roundedScore >= 0.85 ? "HIGH_DUPLICATION" : "STRUCTURAL_SIMILARITY";
 
-            String snippet = clusterSnippet.getOrDefault(root, "");
-            if (snippet.length() > 500) {
-                snippet = snippet.substring(0, 500) + "...";
-            }
+            // Synthesize actionable refactoring recommendation
+            boolean allSameFile = members.stream().map(DuplicateMember::filePath).distinct().count() == 1;
+            boolean isRouteOrController = members.stream().anyMatch(m -> {
+                String p = (m.filePath() != null ? m.filePath() : "").toLowerCase();
+                return p.contains("route") || p.contains("controller") || p.contains("endpoint") || p.contains("api");
+            });
+
+            String actionRecommendation = allSameFile ? "REMOVE_SAME_FILE_DUPE"
+                    : isRouteOrController ? "MERGE_ENDPOINTS" : "EXTRACT_SHARED_UTIL";
 
             clusters.add(new DuplicateCluster(
                     "cluster_" + clusterCounter++,
                     roundedScore,
                     severity,
+                    actionRecommendation,
                     occurrences,
                     totalLines,
                     linesSaved,
-                    members,
-                    snippet
+                    members
             ));
 
             totalSavedLines += linesSaved;
@@ -133,8 +137,7 @@ public class DuplicateClusterScanner {
 
     private void union(Map<String, String> parent,
                        Map<String, Double> clusterMaxScore,
-                       Map<String, String> clusterSnippet,
-                       String a, String b, double score, String snippet) {
+                       String a, String b, double score) {
 
         String rootA = find(parent, a);
         String rootB = find(parent, b);
@@ -147,15 +150,8 @@ public class DuplicateClusterScanner {
             if (scoreA != null) {
                 clusterMaxScore.merge(rootB, scoreA, Math::max);
             }
-            String snippetA = clusterSnippet.remove(rootA);
-            if (snippetA != null) {
-                clusterSnippet.putIfAbsent(rootB, snippetA);
-            }
         }
 
         clusterMaxScore.merge(rootB, score, Math::max);
-        if (snippet != null && !snippet.isBlank()) {
-            clusterSnippet.putIfAbsent(rootB, snippet.trim());
-        }
     }
 }

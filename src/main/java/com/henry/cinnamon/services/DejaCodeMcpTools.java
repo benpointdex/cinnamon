@@ -50,34 +50,38 @@ public class DejaCodeMcpTools {
             @ToolParam(description = "Source code snippet of the function to check") String sourceCode,
             @ToolParam(description = "File path or target file e.g. 'src/utils/math.ts'") String filePath) {
 
-        String tenantId = TenantContext.get();
-        if (sourceCode == null || sourceCode.isBlank()) {
-            return List.of();
-        }
-
-        Optional<CodeUnit> probeOpt = functionExtractor.extractSingle(sourceCode, filePath, repository);
-        if (probeOpt.isEmpty()) {
-            return List.of(); // Safely return empty list if no function structure was found
-        }
-
-        DetectionResult result = cascade.detect(probeOpt.get(), tenantId, repository);
-        if (result == null || !result.matchFound()) {
-            return List.of();
-        }
-
-        List<SimilarFunctionResult> results = new ArrayList<>();
-        for (CodeUnit candidate : result.candidates()) {
-            if (candidate != null) {
-                results.add(new SimilarFunctionResult(
-                    candidate.getFilePath(),
-                    candidate.getFunctionName(),
-                    result.similarityScore(),
-                    candidate.getLineCount(),
-                    result.matchTier()
-                ));
+        try {
+            String tenantId = TenantContext.get();
+            if (sourceCode == null || sourceCode.isBlank()) {
+                return List.of();
             }
+
+            Optional<CodeUnit> probeOpt = functionExtractor.extractSingle(sourceCode, filePath, repository);
+            if (probeOpt.isEmpty()) {
+                return List.of(); // Safely return empty list if no function structure was found
+            }
+
+            DetectionResult result = cascade.detect(probeOpt.get(), tenantId, repository);
+            if (result == null || !result.matchFound()) {
+                return List.of();
+            }
+
+            List<SimilarFunctionResult> results = new ArrayList<>();
+            for (CodeUnit candidate : result.candidates()) {
+                if (candidate != null) {
+                    results.add(new SimilarFunctionResult(
+                        candidate.getFilePath(),
+                        candidate.getFunctionName(),
+                        result.similarityScore(),
+                        candidate.getLineCount(),
+                        result.matchTier()
+                    ));
+                }
+            }
+            return results;
+        } catch (Exception e) {
+            return List.of();
         }
-        return results;
     }
 
     /**

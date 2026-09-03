@@ -31,13 +31,13 @@ class DuplicateClusterScannerTest {
         DuplicatePairProjection pair1 = createMockProjection(
                 "src/routes/attendance.js", "verifyAttendance",
                 "src/routes/hpc.js", "verifyHpc",
-                40, 40, 0.96, "function verify(req) { auth(); }"
+                40, 40, 0.96
         );
 
         DuplicatePairProjection pair2 = createMockProjection(
                 "src/routes/hpc.js", "verifyHpc",
                 "src/routes/fees.js", "verifyFees",
-                40, 40, 0.92, "function verify(req) { auth(); }"
+                40, 40, 0.92
         );
 
         when(codeUnitRepository.scanRepositoryDuplicates(anyString(), anyString(), anyDouble(), any(), anyInt()))
@@ -57,8 +57,30 @@ class DuplicateClusterScannerTest {
         assertEquals(80, cluster.estimatedLinesSaved());
         assertEquals(0.96, cluster.similarityScore());
         assertEquals("CRITICAL_COPY_PASTE", cluster.severity());
-        assertEquals("function verify(req) { auth(); }", cluster.representativeSnippet());
+        assertEquals("MERGE_ENDPOINTS", cluster.actionRecommendation());
         assertEquals(3, cluster.members().size());
+    }
+
+    @Test
+    void shouldDetectIntraFileDuplicatesAndRecommendRemoval() {
+        // Real-world scenario: identical function duplicated in the exact same file
+        DuplicatePairProjection sameFilePair = createMockProjection(
+                "lib/features/missions/assignments_screen.dart", "_formatSubmittedDate",
+                "lib/features/missions/assignments_screen.dart", "_formatSubmittedDateCopy",
+                25, 25, 0.99
+        );
+
+        when(codeUnitRepository.scanRepositoryDuplicates(anyString(), anyString(), anyDouble(), any(), anyInt()))
+                .thenReturn(List.of(sameFilePair));
+
+        RepositoryDuplicateScanResponse response = scanner.scan("tenant-1", "atipriye", 0.85, null, 50);
+
+        assertEquals(1, response.totalClustersFound());
+        DuplicateCluster cluster = response.clusters().get(0);
+        assertEquals("CRITICAL_COPY_PASTE", cluster.severity());
+        assertEquals("REMOVE_SAME_FILE_DUPE", cluster.actionRecommendation());
+        assertEquals(2, cluster.occurrences());
+        assertEquals(25, cluster.estimatedLinesSaved());
     }
 
     @Test
@@ -77,7 +99,7 @@ class DuplicateClusterScannerTest {
 
     private DuplicatePairProjection createMockProjection(
             String pathA, String funcA, String pathB, String funcB,
-            int linesA, int linesB, double score, String snippet) {
+            int linesA, int linesB, double score) {
 
         return new DuplicatePairProjection() {
             @Override public String getFilePathA() { return pathA; }
@@ -87,7 +109,6 @@ class DuplicateClusterScannerTest {
             @Override public Integer getLineCountA() { return linesA; }
             @Override public Integer getLineCountB() { return linesB; }
             @Override public Double getSimilarityScore() { return score; }
-            @Override public String getSnippetA() { return snippet; }
         };
     }
 }

@@ -106,6 +106,15 @@ public class IngestionJobService {
                     embedAndSaveBatch(pendingBatch);
                     indexedCount += pendingBatch.size();
                     pendingBatch.clear();
+
+                    // Update live progress in DB
+                    job.setProcessedFiles(processedFilesCount);
+                    job.setFunctionsIndexed(indexedCount);
+                    job.setFunctionsSkippedUnchanged(skippedCount);
+                    jobRepository.save(job);
+                } else if (processedFilesCount % 5 == 0) {
+                    job.setProcessedFiles(processedFilesCount);
+                    jobRepository.save(job);
                 }
             }
 

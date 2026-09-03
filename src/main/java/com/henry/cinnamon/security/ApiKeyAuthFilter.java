@@ -38,12 +38,19 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 2. Extract X-Api-Key header
+        // 2. Extract X-Api-Key or Authorization: Bearer header
         String apiKey = request.getHeader("X-Api-Key");
+        if (apiKey == null || apiKey.isBlank()) {
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && authHeader.toLowerCase().startsWith("bearer ")) {
+                apiKey = authHeader.substring(7).trim();
+            }
+        }
+
         if (apiKey == null || apiKey.isBlank()) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
-            response.getWriter().write("{\"error\": \"Missing required X-Api-Key header\"}");
+            response.getWriter().write("{\"error\": \"Missing required X-Api-Key or Authorization header\"}");
             return;
         }
 

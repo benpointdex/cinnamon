@@ -60,8 +60,14 @@ public class DuplicateDetectionCascade {
             }
 
             String queryVectorStr = toPgVectorString(probe.getEmbedding());
-            List<CodeUnit> nearestNeighbors = codeUnitRepository.findNearestNeighbors(
-                    tenantId, repository, queryVectorStr, TOP_K_CANDIDATES);
+            List<CodeUnit> nearestNeighbors;
+            try {
+                nearestNeighbors = codeUnitRepository.findNearestNeighbors(
+                        tenantId, repository, queryVectorStr, TOP_K_CANDIDATES);
+            } catch (Exception e) {
+                // Return gracefully if table is empty or pgvector query returns zero rows
+                return DetectionResult.noMatch();
+            }
 
             if (nearestNeighbors == null || nearestNeighbors.isEmpty()) {
                 return DetectionResult.noMatch();

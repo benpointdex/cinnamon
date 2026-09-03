@@ -54,14 +54,12 @@ public interface CodeUnitRepository extends JpaRepository<CodeUnit, UUID> {
             c2.function_name AS functionNameB,
             c1.line_count AS lineCountA,
             c2.line_count AS lineCountB,
-            CAST(1.0 - (c1.embedding <=> c2.embedding) AS DOUBLE PRECISION) AS similarityScore,
-            SUBSTRING(c1.normalized_text FROM 1 FOR 600) AS snippetA
+            CAST(1.0 - (c1.embedding <=> c2.embedding) AS DOUBLE PRECISION) AS similarityScore
         FROM code_units c1
         JOIN code_units c2 
           ON c1.tenant_id = c2.tenant_id 
          AND c1.repository = c2.repository
          AND c1.id < c2.id
-         AND (c1.file_path != c2.file_path OR c1.function_name != c2.function_name)
         WHERE c1.tenant_id = :tenantId
           AND c1.repository = :repository
           AND c1.embedding IS NOT NULL
