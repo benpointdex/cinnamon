@@ -8,4 +8,5 @@ public interface DuplicatePairProjection {
     Integer getLineCountA();
     Integer getLineCountB();
     Double getSimilarityScore();
+    String getSnippetA();
 }

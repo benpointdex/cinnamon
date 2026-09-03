@@ -84,12 +84,12 @@ public class DejaCodeMcpTools {
      * Tool 2: scan_repository_duplicates
      * Performs a server-side whole-repository vector self-join scan across all indexed code units (< 50ms).
      */
-    @Tool(description = "Scans the entire repository in one shot using in-database pgvector similarity to discover and rank all duplicate clusters across all files. Returns ranked duplicate pairs without requiring client-side batching.")
-    public List<DuplicateClusterResult> scanRepositoryDuplicates(
+    @Tool(description = "Scans the entire repository in one shot using in-database pgvector similarity. Aggregates pairwise duplicates into N-way clusters with severity levels (CRITICAL, HIGH), line savings, and code snippets.")
+    public RepositoryDuplicateScanResponse scanRepositoryDuplicates(
             @ToolParam(description = "Repository name e.g. 'cinnamon'") String repository,
             @ToolParam(description = "Minimum cosine similarity threshold (e.g. 0.85 for 85%). Default is 0.85", required = false) Double minSimilarity,
             @ToolParam(description = "Optional folder path filter e.g. 'src/routes/' to scope the scan", required = false) String pathPrefix,
-            @ToolParam(description = "Maximum number of duplicate pairs to return. Default is 50", required = false) Integer limit) {
+            @ToolParam(description = "Maximum number of duplicate pairs to analyze. Default is 100", required = false) Integer limit) {
 
         String tenantId = TenantContext.get();
         return clusterScanner.scan(tenantId, repository, minSimilarity, pathPrefix, limit);
