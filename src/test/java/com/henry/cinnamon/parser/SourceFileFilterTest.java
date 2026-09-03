@@ -40,11 +40,45 @@ class SourceFileFilterTest {
         assertFalse(filter.isEligibleCodeFile(Path.of("types.generated.ts"), 1000));
         assertFalse(filter.isEligibleCodeFile(Path.of("UserService.java"), 600_000)); // > 500KB
 
-        // Accepted code files
+        // Accepted code files across existing languages
         assertTrue(filter.isEligibleCodeFile(Path.of("UserService.java"), 15_000));
         assertTrue(filter.isEligibleCodeFile(Path.of("calculator.ts"), 8_000));
         assertTrue(filter.isEligibleCodeFile(Path.of("Header.tsx"), 12_000));
         assertTrue(filter.isEligibleCodeFile(Path.of("auth.js"), 5_000));
+    }
+
+    @Test
+    void shouldSupportAllNineLanguagesAndFilterTheirTests() {
+        // Python
+        assertTrue(filter.isEligibleCodeFile(Path.of("main.py"), 2000));
+        assertFalse(filter.isEligibleCodeFile(Path.of("test_auth.py"), 2000));
+        assertFalse(filter.isEligibleCodeFile(Path.of("user_test.py"), 2000));
+
+        // Go
+        assertTrue(filter.isEligibleCodeFile(Path.of("server.go"), 3000));
+        assertFalse(filter.isEligibleCodeFile(Path.of("server_test.go"), 3000));
+
+        // Dart (Flutter)
+        assertTrue(filter.isEligibleCodeFile(Path.of("fees_screen.dart"), 4000));
+        assertFalse(filter.isEligibleCodeFile(Path.of("fees_screen_test.dart"), 4000));
+        assertFalse(filter.isEligibleCodeFile(Path.of("user.g.dart"), 4000)); // generated
+        assertFalse(filter.isEligibleCodeFile(Path.of("state.freezed.dart"), 4000)); // generated
+
+        // C#
+        assertTrue(filter.isEligibleCodeFile(Path.of("PaymentService.cs"), 5000));
+        assertFalse(filter.isEligibleCodeFile(Path.of("PaymentServiceTest.cs"), 5000));
+
+        // Kotlin
+        assertTrue(filter.isEligibleCodeFile(Path.of("UserViewModel.kt"), 3500));
+        assertFalse(filter.isEligibleCodeFile(Path.of("UserViewModelTest.kt"), 3500));
+
+        // Rust
+        assertTrue(filter.isEligibleCodeFile(Path.of("lib.rs"), 4500));
+        assertFalse(filter.isEligibleCodeFile(Path.of("lib_test.rs"), 4500));
+
+        // PHP
+        assertTrue(filter.isEligibleCodeFile(Path.of("UserController.php"), 6000));
+        assertFalse(filter.isEligibleCodeFile(Path.of("UserControllerTest.php"), 6000));
     }
 
     @Test

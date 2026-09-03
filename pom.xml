@@ -101,6 +101,55 @@
 			<version>0.23.1</version>
 		</dependency>
 
+		<!-- Tree-sitter Python Grammar -->
+		<dependency>
+			<groupId>io.github.bonede</groupId>
+			<artifactId>tree-sitter-python</artifactId>
+			<version>0.23.4</version>
+		</dependency>
+
+		<!-- Tree-sitter Go Grammar -->
+		<dependency>
+			<groupId>io.github.bonede</groupId>
+			<artifactId>tree-sitter-go</artifactId>
+			<version>0.23.3</version>
+		</dependency>
+
+		<!-- Tree-sitter C# Grammar -->
+		<dependency>
+			<groupId>io.github.bonede</groupId>
+			<artifactId>tree-sitter-c-sharp</artifactId>
+			<version>0.23.1</version>
+		</dependency>
+
+		<!-- Tree-sitter Dart Grammar -->
+		<dependency>
+			<groupId>io.github.bonede</groupId>
+			<artifactId>tree-sitter-dart</artifactId>
+			<version>master-a</version>
+		</dependency>
+
+		<!-- Tree-sitter Kotlin Grammar -->
+		<dependency>
+			<groupId>io.github.bonede</groupId>
+			<artifactId>tree-sitter-kotlin</artifactId>
+			<version>0.3.8.1</version>
+		</dependency>
+
+		<!-- Tree-sitter Rust Grammar -->
+		<dependency>
+			<groupId>io.github.bonede</groupId>
+			<artifactId>tree-sitter-rust</artifactId>
+			<version>0.23.1</version>
+		</dependency>
+
+		<!-- Tree-sitter PHP Grammar -->
+		<dependency>
+			<groupId>io.github.bonede</groupId>
+			<artifactId>tree-sitter-php</artifactId>
+			<version>0.23.11</version>
+		</dependency>
+
 		<!-- Eclipse JGit for Pure-Java Git Repository Cloning -->
 		<dependency>
 			<groupId>org.eclipse.jgit</groupId>

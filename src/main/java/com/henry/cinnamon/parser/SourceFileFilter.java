@@ -20,9 +20,16 @@ public class SourceFileFilter {
             "obj", "__pycache__", ".pnpm-store", "bower_components", "logs", ".cache", ".parcel-cache"
     );
 
-    // Filter Level 2: Supported Code Extensions
+    // Filter Level 2: Supported Code Extensions across 9 major languages
     private static final Set<String> SUPPORTED_EXTENSIONS = Set.of(
-            "java", "ts", "tsx", "js", "jsx", "mjs", "cjs"
+            "java", "ts", "tsx", "js", "jsx", "mjs", "cjs",
+            "py", "pyi", "pyw",
+            "go",
+            "dart",
+            "cs",
+            "kt", "kts",
+            "rs",
+            "php", "phtml"
     );
 
     // Filter Level 3 Regex Patterns for Trivial Boilerplate (Getters, Setters, Empty Bodies)
@@ -82,21 +89,30 @@ public class SourceFileFilter {
             return false;
         }
 
-        // 3. Filter out unit and integration tests
+        // 3. Filter out unit and integration tests across languages
         if (lowerName.contains(".test.")
                 || lowerName.contains(".spec.")
                 || lowerName.contains("_test.")
                 || lowerName.contains("-test.")
+                || lowerName.startsWith("test_")
                 || lowerName.endsWith("test.java")
                 || lowerName.endsWith("tests.java")
                 || lowerName.endsWith("testcase.java")
-                || lowerName.endsWith("it.java")) {
+                || lowerName.endsWith("it.java")
+                || lowerName.endsWith("test.cs")
+                || lowerName.endsWith("tests.cs")
+                || lowerName.endsWith("test.kt")
+                || lowerName.endsWith("tests.kt")
+                || lowerName.endsWith("test.php")
+                || lowerName.endsWith("testcase.php")) {
             return false;
         }
 
-        // 4. Filter out generated, config, and fixture mocks
+        // 4. Filter out generated, config, and fixture mocks (including Flutter .g.dart, .freezed.dart)
         if (lowerName.contains(".generated.")
                 || lowerName.contains(".g.ts")
+                || lowerName.contains(".g.dart")
+                || lowerName.contains(".freezed.dart")
                 || lowerName.contains(".config.")
                 || lowerName.contains(".setup.")
                 || lowerName.contains(".mock.")
