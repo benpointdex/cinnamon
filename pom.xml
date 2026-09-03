@@ -101,6 +101,13 @@
 			<version>0.23.1</version>
 		</dependency>
 
+		<!-- Eclipse JGit for Pure-Java Git Repository Cloning -->
+		<dependency>
+			<groupId>org.eclipse.jgit</groupId>
+			<artifactId>org.eclipse.jgit</artifactId>
+			<version>6.9.0.202403050737-r</version>
+		</dependency>
+
 
 		<!-- Rate Limiting -->
 		<dependency>

@@ -22,19 +22,22 @@ public class DejaCodeMcpTools {
     private final DuplicateFindingRepository findingRepository;
     private final DuplicateReportService reportService;
     private final DuplicateClusterScanner clusterScanner;
+    private final GitRepositoryIngestionService gitIngestionService;
 
     public DejaCodeMcpTools(FunctionExtractor functionExtractor,
                             DuplicateDetectionCascade cascade,
                             IngestionJobService ingestionJobService,
                             DuplicateFindingRepository findingRepository,
                             DuplicateReportService reportService,
-                            DuplicateClusterScanner clusterScanner) {
+                            DuplicateClusterScanner clusterScanner,
+                            GitRepositoryIngestionService gitIngestionService) {
         this.functionExtractor = functionExtractor;
         this.cascade = cascade;
         this.ingestionJobService = ingestionJobService;
         this.findingRepository = findingRepository;
         this.reportService = reportService;
         this.clusterScanner = clusterScanner;
+        this.gitIngestionService = gitIngestionService;
     }
 
     /**
@@ -78,7 +81,7 @@ public class DejaCodeMcpTools {
     }
 
     /**
-     * Tool 2: scan_repository_duplicates (NEW)
+     * Tool 2: scan_repository_duplicates
      * Performs a server-side whole-repository vector self-join scan across all indexed code units (< 50ms).
      */
     @Tool(description = "Scans the entire repository in one shot using in-database pgvector similarity to discover and rank all duplicate clusters across all files. Returns ranked duplicate pairs without requiring client-side batching.")
@@ -93,10 +96,34 @@ public class DejaCodeMcpTools {
     }
 
     /**
-     * Tool 3: ingest_files
-     * Starts asynchronous background indexing of any batch or entire repository.
+     * Tool 3: ingest_github_repository (NEW)
+     * Performs a one-click shallow Git clone, smart filtering, and vector indexing directly on the server.
      */
-    @Tool(description = "Starts indexing a list of files or an entire repository into DejaCode. Handles large payloads with internal auto-partitioning. Returns immediately with a job ID.")
+    @Tool(description = "Clones and indexes an entire public or private GitHub repository directly on the server in one click with zero code transferred over MCP. For private repos, provide githubToken (which can be obtained by running 'gh auth token' or a GitHub PAT).")
+    public IngestJobHandle ingestGithubRepository(
+            @ToolParam(description = "Git repository HTTPS or SSH clone URL (e.g. https://github.com/my-org/my-repo)") String repoUrl,
+            @ToolParam(description = "Target repository name in DejaCode (defaults to repository name extracted from URL)", required = false) String repository,
+            @ToolParam(description = "Branch name (defaults to 'main')", required = false) String branch,
+            @ToolParam(description = "GitHub Access Token for private repositories (can be obtained via 'gh auth token' or a GitHub PAT)", required = false) String githubToken,
+            @ToolParam(description = "Optional list of source folders to restrict scanning to e.g. ['src', 'lib']", required = false) List<String> sourceDirs) {
+
+        String tenantId = TenantContext.get();
+        String repoName = (repository != null && !repository.isBlank())
+                ? repository.trim()
+                : extractRepoNameFromUrl(repoUrl);
+
+        IngestionJob job = gitIngestionService.createJob(tenantId, repoName);
+        gitIngestionService.processGitCloneAsync(job.getId(), repoUrl, repoName, branch, githubToken, sourceDirs, tenantId);
+
+        return new IngestJobHandle(job.getId(), "STARTED", 0,
+                "Shallow cloning and indexing repository '" + repoName + "' in background with smart filtering");
+    }
+
+    /**
+     * Tool 4: ingest_files
+     * Starts asynchronous background indexing of a list of files.
+     */
+    @Tool(description = "Starts indexing a list of files into DejaCode. Handles payloads with internal auto-partitioning. Returns immediately with a job ID.")
     public IngestJobHandle ingestFiles(
             @ToolParam(description = "Repository name e.g. 'cinnamon'") String repository,
             @ToolParam(description = "List of file paths and their contents") List<FileInput> files) {
@@ -111,17 +138,17 @@ public class DejaCodeMcpTools {
     }
 
     /**
-     * Tool 4: get_ingestion_status
+     * Tool 5: get_ingestion_status
      * Checks progress and metrics of an indexing job.
      */
-    @Tool(description = "Checks the progress and statistics of an indexing job started with ingest_files.")
+    @Tool(description = "Checks the progress and statistics of an indexing job started with ingest_files or ingest_github_repository.")
     public IngestionJob getIngestionStatus(
-            @ToolParam(description = "Job ID returned by ingest_files") String jobId) {
+            @ToolParam(description = "Job ID returned by ingest_files or ingest_github_repository") String jobId) {
         return ingestionJobService.get(UUID.fromString(jobId));
     }
 
     /**
-     * Tool 5: record_duplicate
+     * Tool 6: record_duplicate
      * Called by the client AI agent (Claude Code / Cursor) when it confirms duplicate logic using its own model.
      */
     @Tool(description = "Records a confirmed duplicate finding in this repository after your agent confirms duplicate logic. Persists finding and metrics.")
@@ -153,7 +180,7 @@ public class DejaCodeMcpTools {
     }
 
     /**
-     * Tool 6: get_duplicate_report
+     * Tool 7: get_duplicate_report
      * Returns duplication metrics, consolidated lines, and worst offender files for the repository with optional path and similarity filtering.
      */
     @Tool(description = "Returns a report of confirmed duplicate findings for a repository — total count, estimated lines of duplicated code, and most affected files, with optional pathPrefix and minSimilarity filters.")
@@ -164,5 +191,20 @@ public class DejaCodeMcpTools {
 
         String tenantId = TenantContext.get();
         return reportService.summarize(tenantId, repository, pathPrefix, minSimilarity);
+    }
+
+    private String extractRepoNameFromUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return "default-repo";
+        }
+        String clean = url.trim();
+        if (clean.endsWith(".git")) {
+            clean = clean.substring(0, clean.length() - 4);
+        }
+        int lastSlash = clean.lastIndexOf('/');
+        if (lastSlash != -1 && lastSlash < clean.length() - 1) {
+            return clean.substring(lastSlash + 1);
+        }
+        return "repo-" + System.currentTimeMillis();
     }
 }
