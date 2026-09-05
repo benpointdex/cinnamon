@@ -7,6 +7,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.context.annotation.Lazy;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,10 +25,19 @@ public class DuplicateDetectionCascade {
 
     private final CodeUnitRepository codeUnitRepository;
     private final EmbeddingModel embeddingModel; // In-process ONNX embedding model
+    private final MeterRegistry meterRegistry;
 
-    public DuplicateDetectionCascade(CodeUnitRepository codeUnitRepository, @Lazy EmbeddingModel embeddingModel) {
+    @Autowired
+    public DuplicateDetectionCascade(CodeUnitRepository codeUnitRepository,
+                                    @Lazy EmbeddingModel embeddingModel,
+                                    MeterRegistry meterRegistry) {
         this.codeUnitRepository = codeUnitRepository;
         this.embeddingModel = embeddingModel;
+        this.meterRegistry = meterRegistry != null ? meterRegistry : new SimpleMeterRegistry();
+    }
+
+    public DuplicateDetectionCascade(CodeUnitRepository codeUnitRepository, @Lazy EmbeddingModel embeddingModel) {
+        this(codeUnitRepository, embeddingModel, new SimpleMeterRegistry());
     }
 
     /**
@@ -51,7 +64,9 @@ public class DuplicateDetectionCascade {
 
             // --- Tier 2: In-Process Local Vector Embedding + pgvector HNSW Search ---
             if (probe.getEmbedding() == null) {
+                Timer.Sample embSample = Timer.start(meterRegistry);
                 float[] vector = embeddingModel.embed(probe.getNormalizedText());
+                embSample.stop(meterRegistry.timer("dejacode.embedding.batch.duration", "batch_size", "1"));
                 probe.setEmbedding(vector);
             }
 
@@ -61,12 +76,15 @@ public class DuplicateDetectionCascade {
 
             String queryVectorStr = toPgVectorString(probe.getEmbedding());
             List<CodeUnit> nearestNeighbors;
+            Timer.Sample searchSample = Timer.start(meterRegistry);
             try {
                 nearestNeighbors = codeUnitRepository.findNearestNeighbors(
                         tenantId, repository, queryVectorStr, TOP_K_CANDIDATES);
             } catch (Exception e) {
                 // Return gracefully if table is empty or pgvector query returns zero rows
                 return DetectionResult.noMatch();
+            } finally {
+                searchSample.stop(meterRegistry.timer("dejacode.db.vector.search.duration", "type", "nearest_neighbor"));
             }
 
             if (nearestNeighbors == null || nearestNeighbors.isEmpty()) {

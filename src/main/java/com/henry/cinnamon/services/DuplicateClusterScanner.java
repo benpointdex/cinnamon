@@ -5,6 +5,10 @@ import com.henry.cinnamon.model.DuplicateMember;
 import com.henry.cinnamon.model.DuplicatePairProjection;
 import com.henry.cinnamon.model.RepositoryDuplicateScanResponse;
 import com.henry.cinnamon.repository.CodeUnitRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -13,9 +17,16 @@ import java.util.*;
 public class DuplicateClusterScanner {
 
     private final CodeUnitRepository codeUnitRepository;
+    private final MeterRegistry meterRegistry;
+
+    @Autowired
+    public DuplicateClusterScanner(CodeUnitRepository codeUnitRepository, MeterRegistry meterRegistry) {
+        this.codeUnitRepository = codeUnitRepository;
+        this.meterRegistry = meterRegistry != null ? meterRegistry : new SimpleMeterRegistry();
+    }
 
     public DuplicateClusterScanner(CodeUnitRepository codeUnitRepository) {
-        this.codeUnitRepository = codeUnitRepository;
+        this(codeUnitRepository, new SimpleMeterRegistry());
     }
 
     /**
@@ -29,8 +40,14 @@ public class DuplicateClusterScanner {
         int maxResults = (limit != null && limit > 0) ? limit : 100;
         String prefix = (pathPrefix != null && !pathPrefix.isBlank()) ? pathPrefix.trim() : null;
 
-        List<DuplicatePairProjection> pairs = codeUnitRepository.scanRepositoryDuplicates(
-                tenantId, repository, threshold, prefix, maxResults);
+        Timer.Sample dbSample = Timer.start(meterRegistry);
+        List<DuplicatePairProjection> pairs;
+        try {
+            pairs = codeUnitRepository.scanRepositoryDuplicates(
+                    tenantId, repository, threshold, prefix, maxResults);
+        } finally {
+            dbSample.stop(meterRegistry.timer("dejacode.db.vector.search.duration", "type", "self_join"));
+        }
 
         if (pairs == null || pairs.isEmpty()) {
             return new RepositoryDuplicateScanResponse(repository, 0, 0, 0, List.of());

@@ -12,6 +12,9 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,10 +23,17 @@ public class FunctionExtractor {
 
     private final LanguageAdapterRegistry registry;
     private final IdentifierNormalizer normalizer;
+    private final MeterRegistry meterRegistry;
 
-    public FunctionExtractor(LanguageAdapterRegistry registry, IdentifierNormalizer normalizer) {
+    @Autowired
+    public FunctionExtractor(LanguageAdapterRegistry registry, IdentifierNormalizer normalizer, MeterRegistry meterRegistry) {
         this.registry = registry;
         this.normalizer = normalizer;
+        this.meterRegistry = meterRegistry != null ? meterRegistry : new SimpleMeterRegistry();
+    }
+
+    public FunctionExtractor(LanguageAdapterRegistry registry, IdentifierNormalizer normalizer) {
+        this(registry, normalizer, new SimpleMeterRegistry());
     }
 
     /**
@@ -52,6 +62,10 @@ public class FunctionExtractor {
 
             List<CodeUnit> units = new ArrayList<>();
             walk(tree.getRootNode(), sourceCode, filePath, repository, lang, units);
+            if (!units.isEmpty()) {
+                String langName = lang.getClass().getSimpleName().replace("LanguageAdapter", "").toLowerCase();
+                meterRegistry.counter("dejacode.parser.functions.extracted", "language", langName).increment(units.size());
+            }
             return units;
         } catch (Exception e) {
             // Guard against any malformed AST syntax error
