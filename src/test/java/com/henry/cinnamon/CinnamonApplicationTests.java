@@ -10,5 +10,4 @@ class CinnamonApplicationTests {
 	@Test
 	void contextLoads() {
 	}
-
 }

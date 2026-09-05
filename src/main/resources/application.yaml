@@ -53,6 +53,32 @@ spring:
             enable: true
             required: true
 
+
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: health, info, prometheus, metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+      probes:
+        enabled: true
+
+  health:
+    mail:
+      enabled: false
+    db:
+      enabled: true
+    diskspace:
+      enabled: true
+
+logging:
+  structured:
+    format:
+      console: ${LOGGING_STRUCTURED_FORMAT_CONSOLE:}
+
 server:
   tomcat:
     threads:

@@ -4,14 +4,19 @@ import com.henry.cinnamon.model.*;
 import com.henry.cinnamon.parser.FunctionExtractor;
 import com.henry.cinnamon.repository.DuplicateFindingRepository;
 import com.henry.cinnamon.security.TenantContext;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 @Service
 public class DejaCodeMcpTools {
@@ -23,6 +28,26 @@ public class DejaCodeMcpTools {
     private final DuplicateReportService reportService;
     private final DuplicateClusterScanner clusterScanner;
     private final GitRepositoryIngestionService gitIngestionService;
+    private final MeterRegistry meterRegistry;
+
+    @Autowired
+    public DejaCodeMcpTools(FunctionExtractor functionExtractor,
+                            DuplicateDetectionCascade cascade,
+                            IngestionJobService ingestionJobService,
+                            DuplicateFindingRepository findingRepository,
+                            DuplicateReportService reportService,
+                            DuplicateClusterScanner clusterScanner,
+                            GitRepositoryIngestionService gitIngestionService,
+                            MeterRegistry meterRegistry) {
+        this.functionExtractor = functionExtractor;
+        this.cascade = cascade;
+        this.ingestionJobService = ingestionJobService;
+        this.findingRepository = findingRepository;
+        this.reportService = reportService;
+        this.clusterScanner = clusterScanner;
+        this.gitIngestionService = gitIngestionService;
+        this.meterRegistry = meterRegistry != null ? meterRegistry : new SimpleMeterRegistry();
+    }
 
     public DejaCodeMcpTools(FunctionExtractor functionExtractor,
                             DuplicateDetectionCascade cascade,
@@ -31,13 +56,21 @@ public class DejaCodeMcpTools {
                             DuplicateReportService reportService,
                             DuplicateClusterScanner clusterScanner,
                             GitRepositoryIngestionService gitIngestionService) {
-        this.functionExtractor = functionExtractor;
-        this.cascade = cascade;
-        this.ingestionJobService = ingestionJobService;
-        this.findingRepository = findingRepository;
-        this.reportService = reportService;
-        this.clusterScanner = clusterScanner;
-        this.gitIngestionService = gitIngestionService;
+        this(functionExtractor, cascade, ingestionJobService, findingRepository, reportService, clusterScanner, gitIngestionService, new SimpleMeterRegistry());
+    }
+
+    private <T> T recordTool(String toolName, Supplier<T> action) {
+        Timer.Sample sample = Timer.start(meterRegistry);
+        try {
+            T result = action.get();
+            sample.stop(meterRegistry.timer("dejacode.mcp.tool.duration", "tool", toolName, "status", "success"));
+            meterRegistry.counter("dejacode.mcp.tool.calls.total", "tool", toolName, "status", "success").increment();
+            return result;
+        } catch (Exception e) {
+            sample.stop(meterRegistry.timer("dejacode.mcp.tool.duration", "tool", toolName, "status", "error"));
+            meterRegistry.counter("dejacode.mcp.tool.calls.total", "tool", toolName, "status", "error").increment();
+            throw e;
+        }
     }
 
     /**
@@ -50,38 +83,40 @@ public class DejaCodeMcpTools {
             @ToolParam(description = "Source code snippet of the function to check") String sourceCode,
             @ToolParam(description = "File path or target file e.g. 'src/utils/math.ts'") String filePath) {
 
-        try {
-            String tenantId = TenantContext.get();
-            if (sourceCode == null || sourceCode.isBlank()) {
-                return List.of();
-            }
-
-            Optional<CodeUnit> probeOpt = functionExtractor.extractSingle(sourceCode, filePath, repository);
-            if (probeOpt.isEmpty()) {
-                return List.of(); // Safely return empty list if no function structure was found
-            }
-
-            DetectionResult result = cascade.detect(probeOpt.get(), tenantId, repository);
-            if (result == null || !result.matchFound()) {
-                return List.of();
-            }
-
-            List<SimilarFunctionResult> results = new ArrayList<>();
-            for (CodeUnit candidate : result.candidates()) {
-                if (candidate != null) {
-                    results.add(new SimilarFunctionResult(
-                        candidate.getFilePath(),
-                        candidate.getFunctionName(),
-                        result.similarityScore(),
-                        candidate.getLineCount(),
-                        result.matchTier()
-                    ));
+        return recordTool("find_similar_functions", () -> {
+            try {
+                String tenantId = TenantContext.get();
+                if (sourceCode == null || sourceCode.isBlank()) {
+                    return List.of();
                 }
+
+                Optional<CodeUnit> probeOpt = functionExtractor.extractSingle(sourceCode, filePath, repository);
+                if (probeOpt.isEmpty()) {
+                    return List.of(); // Safely return empty list if no function structure was found
+                }
+
+                DetectionResult result = cascade.detect(probeOpt.get(), tenantId, repository);
+                if (result == null || !result.matchFound()) {
+                    return List.of();
+                }
+
+                List<SimilarFunctionResult> results = new ArrayList<>();
+                for (CodeUnit candidate : result.candidates()) {
+                    if (candidate != null) {
+                        results.add(new SimilarFunctionResult(
+                            candidate.getFilePath(),
+                            candidate.getFunctionName(),
+                            result.similarityScore(),
+                            candidate.getLineCount(),
+                            result.matchTier()
+                        ));
+                    }
+                }
+                return results;
+            } catch (Exception e) {
+                return List.of();
             }
-            return results;
-        } catch (Exception e) {
-            return List.of();
-        }
+        });
     }
 
     /**
@@ -95,8 +130,10 @@ public class DejaCodeMcpTools {
             @ToolParam(description = "Optional folder path filter e.g. 'src/routes/' to scope the scan", required = false) String pathPrefix,
             @ToolParam(description = "Maximum number of duplicate pairs to analyze. Default is 100", required = false) Integer limit) {
 
-        String tenantId = TenantContext.get();
-        return clusterScanner.scan(tenantId, repository, minSimilarity, pathPrefix, limit);
+        return recordTool("scan_repository_duplicates", () -> {
+            String tenantId = TenantContext.get();
+            return clusterScanner.scan(tenantId, repository, minSimilarity, pathPrefix, limit);
+        });
     }
 
     /**
@@ -111,16 +148,18 @@ public class DejaCodeMcpTools {
             @ToolParam(description = "GitHub Access Token for private repositories (can be obtained via 'gh auth token' or a GitHub PAT)", required = false) String githubToken,
             @ToolParam(description = "Optional list of source folders to restrict scanning to e.g. ['src', 'lib']", required = false) List<String> sourceDirs) {
 
-        String tenantId = TenantContext.get();
-        String repoName = (repository != null && !repository.isBlank())
-                ? repository.trim()
-                : extractRepoNameFromUrl(repoUrl);
+        return recordTool("ingest_github_repository", () -> {
+            String tenantId = TenantContext.get();
+            String repoName = (repository != null && !repository.isBlank())
+                    ? repository.trim()
+                    : extractRepoNameFromUrl(repoUrl);
 
-        IngestionJob job = gitIngestionService.createJob(tenantId, repoName);
-        gitIngestionService.processGitCloneAsync(job.getId(), repoUrl, repoName, branch, githubToken, sourceDirs, tenantId);
+            IngestionJob job = gitIngestionService.createJob(tenantId, repoName);
+            gitIngestionService.processGitCloneAsync(job.getId(), repoUrl, repoName, branch, githubToken, sourceDirs, tenantId);
 
-        return new IngestJobHandle(job.getId(), "STARTED", 0,
-                "Shallow cloning and indexing repository '" + repoName + "' in background with smart filtering");
+            return new IngestJobHandle(job.getId(), "STARTED", 0,
+                    "Shallow cloning and indexing repository '" + repoName + "' in background with smart filtering");
+        });
     }
 
     /**
@@ -132,13 +171,15 @@ public class DejaCodeMcpTools {
             @ToolParam(description = "Repository name e.g. 'cinnamon'") String repository,
             @ToolParam(description = "List of file paths and their contents") List<FileInput> files) {
 
-        String tenantId = TenantContext.get();
-        int count = (files != null) ? files.size() : 0;
-        IngestionJob job = ingestionJobService.create(tenantId, repository, count);
-        if (files != null && !files.isEmpty()) {
-            ingestionJobService.processAsync(job.getId(), files, tenantId, repository, "mcp-agent");
-        }
-        return new IngestJobHandle(job.getId(), "STARTED", count, "Indexing files in background with auto-partitioning");
+        return recordTool("ingest_files", () -> {
+            String tenantId = TenantContext.get();
+            int count = (files != null) ? files.size() : 0;
+            IngestionJob job = ingestionJobService.create(tenantId, repository, count);
+            if (files != null && !files.isEmpty()) {
+                ingestionJobService.processAsync(job.getId(), files, tenantId, repository, "mcp-agent");
+            }
+            return new IngestJobHandle(job.getId(), "STARTED", count, "Indexing files in background with auto-partitioning");
+        });
     }
 
     /**
@@ -148,7 +189,7 @@ public class DejaCodeMcpTools {
     @Tool(description = "Checks the progress and statistics of an indexing job started with ingest_files or ingest_github_repository.")
     public IngestionJob getIngestionStatus(
             @ToolParam(description = "Job ID returned by ingest_files or ingest_github_repository") String jobId) {
-        return ingestionJobService.get(UUID.fromString(jobId));
+        return recordTool("get_ingestion_status", () -> ingestionJobService.get(UUID.fromString(jobId)));
     }
 
     /**
@@ -166,21 +207,23 @@ public class DejaCodeMcpTools {
             @ToolParam(description = "One-sentence technical reasoning explaining why logic is duplicate") String reasoning,
             @ToolParam(description = "Git commit SHA") String commitSha) {
 
-        String tenantId = TenantContext.get();
+        return recordTool("record_duplicate", () -> {
+            String tenantId = TenantContext.get();
 
-        DuplicateFinding finding = new DuplicateFinding();
-        finding.setTenantId(tenantId);
-        finding.setRepository(repository);
-        finding.setNewFilePath(newFilePath);
-        finding.setNewFunctionName(newFunctionName);
-        finding.setMatchedFilePath(matchedFilePath);
-        finding.setMatchedFunctionName(matchedFunctionName);
-        finding.setSimilarityScore(similarityScore);
-        finding.setConfirmedDuplicate(true);
-        finding.setJudgmentReasoning(reasoning);
-        finding.setCommitSha(commitSha);
+            DuplicateFinding finding = new DuplicateFinding();
+            finding.setTenantId(tenantId);
+            finding.setRepository(repository);
+            finding.setNewFilePath(newFilePath);
+            finding.setNewFunctionName(newFunctionName);
+            finding.setMatchedFilePath(matchedFilePath);
+            finding.setMatchedFunctionName(matchedFunctionName);
+            finding.setSimilarityScore(similarityScore);
+            finding.setConfirmedDuplicate(true);
+            finding.setJudgmentReasoning(reasoning);
+            finding.setCommitSha(commitSha);
 
-        return findingRepository.save(finding);
+            return findingRepository.save(finding);
+        });
     }
 
     /**
@@ -193,8 +236,10 @@ public class DejaCodeMcpTools {
             @ToolParam(description = "Optional folder prefix filter e.g. 'src/routes/'", required = false) String pathPrefix,
             @ToolParam(description = "Optional minimum similarity threshold e.g. 0.90", required = false) Double minSimilarity) {
 
-        String tenantId = TenantContext.get();
-        return reportService.summarize(tenantId, repository, pathPrefix, minSimilarity);
+        return recordTool("get_duplicate_report", () -> {
+            String tenantId = TenantContext.get();
+            return reportService.summarize(tenantId, repository, pathPrefix, minSimilarity);
+        });
     }
 
     private String extractRepoNameFromUrl(String url) {

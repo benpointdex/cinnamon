@@ -9,10 +9,15 @@ import com.henry.cinnamon.repository.CodeUnitRepository;
 import com.henry.cinnamon.repository.IngestionJobRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -30,17 +35,29 @@ public class IngestionJobService {
     private final CodeUnitRepository codeUnitRepository;
     private final IngestionJobRepository jobRepository;
     private final EmbeddingModel embeddingModel;
+    private final MeterRegistry meterRegistry;
+
+    @Autowired
+    public IngestionJobService(FunctionExtractor functionExtractor,
+                               SourceFileFilter sourceFileFilter,
+                               CodeUnitRepository codeUnitRepository,
+                               IngestionJobRepository jobRepository,
+                               @Lazy EmbeddingModel embeddingModel,
+                               MeterRegistry meterRegistry) {
+        this.functionExtractor = functionExtractor;
+        this.sourceFileFilter = sourceFileFilter;
+        this.codeUnitRepository = codeUnitRepository;
+        this.jobRepository = jobRepository;
+        this.embeddingModel = embeddingModel;
+        this.meterRegistry = meterRegistry != null ? meterRegistry : new SimpleMeterRegistry();
+    }
 
     public IngestionJobService(FunctionExtractor functionExtractor,
                                SourceFileFilter sourceFileFilter,
                                CodeUnitRepository codeUnitRepository,
                                IngestionJobRepository jobRepository,
                                @Lazy EmbeddingModel embeddingModel) {
-        this.functionExtractor = functionExtractor;
-        this.sourceFileFilter = sourceFileFilter;
-        this.codeUnitRepository = codeUnitRepository;
-        this.jobRepository = jobRepository;
-        this.embeddingModel = embeddingModel;
+        this(functionExtractor, sourceFileFilter, codeUnitRepository, jobRepository, embeddingModel, new SimpleMeterRegistry());
     }
 
     /**
@@ -74,6 +91,10 @@ public class IngestionJobService {
         int processedFilesCount = 0;
 
         try {
+            MDC.put("jobId", jobId.toString());
+            MDC.put("tenantId", tenantId);
+            MDC.put("repo", repository);
+
             for (FileInput file : files) {
                 // 1. Delete previous stale records for this modified file
                 codeUnitRepository.deleteStaleFileUnits(tenantId, repository, file.path());
@@ -131,10 +152,14 @@ public class IngestionJobService {
             log.error("Error during ingestion job {}", jobId, e);
             job.setStatus("FAILED");
         } finally {
-            job.setProcessedFiles(processedFilesCount);
-            job.setFunctionsIndexed(indexedCount);
-            job.setFunctionsSkippedUnchanged(skippedCount);
-            jobRepository.save(job);
+            try {
+                job.setProcessedFiles(processedFilesCount);
+                job.setFunctionsIndexed(indexedCount);
+                job.setFunctionsSkippedUnchanged(skippedCount);
+                jobRepository.save(job);
+            } finally {
+                MDC.clear();
+            }
         }
     }
 
@@ -148,7 +173,9 @@ public class IngestionJobService {
                 .toList();
 
         // Batch matrix inference via Spring AI ONNX Transformers
+        Timer.Sample embSample = Timer.start(meterRegistry);
         List<float[]> vectors = embeddingModel.embed(normalizedTexts);
+        embSample.stop(meterRegistry.timer("dejacode.embedding.batch.duration", "batch_size", String.valueOf(units.size())));
 
         for (int i = 0; i < units.size(); i++) {
             if (i < vectors.size()) {

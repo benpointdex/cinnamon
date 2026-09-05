@@ -13,6 +13,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.UUID;
+import org.slf4j.MDC;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -65,11 +67,15 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
         try {
             // Set ThreadLocal context for the duration of this request
+             MDC.put("tenantId", tenantOpt.get().getTenantId());
+            MDC.put("traceId", UUID.randomUUID().toString().substring(0, 8));
+            MDC.put("userAgent", request.getHeader("User-Agent"));
             TenantContext.set(tenantOpt.get().getTenantId());
             filterChain.doFilter(request, response);
         } finally {
             // Always clear ThreadLocal to prevent memory leaks across pooled threads
             TenantContext.clear();
+              MDC.clear(); 
         }
     }
 }

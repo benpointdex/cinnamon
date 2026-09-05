@@ -12,11 +12,16 @@ import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.FileSystemUtils;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -37,17 +42,29 @@ public class GitRepositoryIngestionService {
     private final CodeUnitRepository codeUnitRepository;
     private final IngestionJobRepository jobRepository;
     private final EmbeddingModel embeddingModel;
+    private final MeterRegistry meterRegistry;
+
+    @Autowired
+    public GitRepositoryIngestionService(SourceFileFilter sourceFileFilter,
+                                         FunctionExtractor functionExtractor,
+                                         CodeUnitRepository codeUnitRepository,
+                                         IngestionJobRepository jobRepository,
+                                         @Lazy EmbeddingModel embeddingModel,
+                                         MeterRegistry meterRegistry) {
+        this.sourceFileFilter = sourceFileFilter;
+        this.functionExtractor = functionExtractor;
+        this.codeUnitRepository = codeUnitRepository;
+        this.jobRepository = jobRepository;
+        this.embeddingModel = embeddingModel;
+        this.meterRegistry = meterRegistry != null ? meterRegistry : new SimpleMeterRegistry();
+    }
 
     public GitRepositoryIngestionService(SourceFileFilter sourceFileFilter,
                                          FunctionExtractor functionExtractor,
                                          CodeUnitRepository codeUnitRepository,
                                          IngestionJobRepository jobRepository,
                                          @Lazy EmbeddingModel embeddingModel) {
-        this.sourceFileFilter = sourceFileFilter;
-        this.functionExtractor = functionExtractor;
-        this.codeUnitRepository = codeUnitRepository;
-        this.jobRepository = jobRepository;
-        this.embeddingModel = embeddingModel;
+        this(sourceFileFilter, functionExtractor, codeUnitRepository, jobRepository, embeddingModel, new SimpleMeterRegistry());
     }
 
     /**
@@ -76,6 +93,10 @@ public class GitRepositoryIngestionService {
         int skippedFunctions = 0;
 
         try {
+            MDC.put("jobId", jobId.toString());
+            MDC.put("tenantId", tenantId);
+            MDC.put("repo", repository);
+
             tempDir = Files.createTempDirectory("dejacode-git-");
             String normalizedUrl = normalizeGitUrl(repoUrl);
 
@@ -215,19 +236,23 @@ public class GitRepositoryIngestionService {
             log.error("Fatal error during Git-native ingestion for repo {}", repoUrl, e);
             job.setStatus("FAILED");
         } finally {
-            job.setProcessedFiles(processedFiles);
-            job.setFunctionsIndexed(indexedFunctions);
-            job.setFunctionsSkippedUnchanged(skippedFunctions);
-            jobRepository.save(job);
+            try {
+                job.setProcessedFiles(processedFiles);
+                job.setFunctionsIndexed(indexedFunctions);
+                job.setFunctionsSkippedUnchanged(skippedFunctions);
+                jobRepository.save(job);
 
-            // Guaranteed cleanup of temporary cloned directory to prevent disk exhaustion
-            if (tempDir != null) {
-                try {
-                    FileSystemUtils.deleteRecursively(tempDir);
-                    log.debug("Cleaned up temporary cloned repository folder at {}", tempDir);
-                } catch (IOException e) {
-                    log.warn("Failed to delete temporary clone directory {}", tempDir, e);
+                // Guaranteed cleanup of temporary cloned directory to prevent disk exhaustion
+                if (tempDir != null) {
+                    try {
+                        FileSystemUtils.deleteRecursively(tempDir);
+                        log.debug("Cleaned up temporary cloned repository folder at {}", tempDir);
+                    } catch (IOException e) {
+                        log.warn("Failed to delete temporary clone directory {}", tempDir, e);
+                    }
                 }
+            } finally {
+                MDC.clear();
             }
         }
     }
@@ -258,7 +283,9 @@ public class GitRepositoryIngestionService {
                 .toList();
 
         // Batched SIMD Matrix inference via Spring AI ONNX Transformers
+        Timer.Sample embSample = Timer.start(meterRegistry);
         List<float[]> vectors = embeddingModel.embed(normalizedTexts);
+        embSample.stop(meterRegistry.timer("dejacode.embedding.batch.duration", "batch_size", String.valueOf(units.size())));
 
         for (int i = 0; i < units.size(); i++) {
             if (i < vectors.size()) {
