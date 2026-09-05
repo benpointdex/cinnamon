@@ -33,3 +33,6 @@ build/
 .vscode/
 /docs/
 .env
+
+# Local monitoring configs & secrets
+prometheus.yml
