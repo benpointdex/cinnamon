@@ -11,12 +11,14 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HexFormat;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class FunctionExtractor {
@@ -61,7 +63,8 @@ public class FunctionExtractor {
             }
 
             List<CodeUnit> units = new ArrayList<>();
-            walk(tree.getRootNode(), sourceCode, filePath, repository, lang, units);
+            Set<String> usedNames = new HashSet<>();
+            walk(tree.getRootNode(), sourceCode, filePath, repository, lang, units, usedNames);
             if (!units.isEmpty()) {
                 String langName = lang.getClass().getSimpleName().replace("LanguageAdapter", "").toLowerCase();
                 meterRegistry.counter("cinnamon.parser.functions.extracted", "language", langName).increment(units.size());
@@ -86,18 +89,30 @@ public class FunctionExtractor {
     }
 
     private void walk(TSNode node, String source, String filePath, String repository,
-                      LanguageAdapter lang, List<CodeUnit> units) {
+                      LanguageAdapter lang, List<CodeUnit> units, Set<String> usedNames) {
         if (node == null || node.isNull()) {
             return;
         }
 
         if (lang.isFunctionNode(node)) {
             String normalizedText = normalizer.normalize(node, source, lang);
+            String rawName = lang.extractFunctionName(node, source);
+            int startLine = getStartLine(source, node);
+
+            String finalName;
+            if (rawName == null || rawName.isBlank() || "anonymous".equalsIgnoreCase(rawName.trim())) {
+                finalName = "anonymous$L" + startLine;
+            } else if (usedNames.contains(rawName)) {
+                finalName = rawName + "$L" + startLine;
+            } else {
+                finalName = rawName;
+            }
+            usedNames.add(finalName);
 
             CodeUnit unit = new CodeUnit();
             unit.setRepository(repository);
             unit.setFilePath(filePath);
-            unit.setFunctionName(lang.extractFunctionName(node, source));
+            unit.setFunctionName(finalName);
             unit.setNormalizedText(normalizedText);
             unit.setContentHash(sha256(normalizedText));
             unit.setLineCount(countLines(source, node));
@@ -107,7 +122,16 @@ public class FunctionExtractor {
         }
 
         for (int i = 0; i < node.getChildCount(); i++) {
-            walk(node.getChild(i), source, filePath, repository, lang, units);
+            walk(node.getChild(i), source, filePath, repository, lang, units, usedNames);
+        }
+    }
+
+    private int getStartLine(String source, TSNode node) {
+        try {
+            int startByte = Math.min(Math.max(0, node.getStartByte()), source.length());
+            return (int) source.substring(0, startByte).lines().count() + 1;
+        } catch (Exception e) {
+            return 1;
         }
     }
 
