@@ -69,19 +69,67 @@ public class TenantService {
     /**
      * Verifies the 6-digit OTP code and upgrades the daily request limit.
      */
-    public void verifyTenant(String tenantId, String code) {
-        Tenant tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tenant not found"));
+    /**
+     * Verifies the 6-digit OTP code by tenantId or email and upgrades the daily request limit.
+     */
+    public void verifyTenant(String tenantId, String email, String code) {
+        if (code == null || code.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Verification code is required");
+        }
+
+        Tenant tenant = null;
+        if (tenantId != null && !tenantId.isBlank()) {
+            tenant = tenantRepository.findById(tenantId).orElse(null);
+        }
+        if (tenant == null && email != null && !email.isBlank()) {
+            tenant = tenantRepository.findByEmail(email.trim()).orElse(null);
+        }
+
+        if (tenant == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Tenant not found");
+        }
+
         if (tenant.getVerificationCodeExpiresAt() != null
                 && Instant.now().isAfter(tenant.getVerificationCodeExpiresAt())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Verification code has expired");
         }
-        if (!code.equals(tenant.getVerificationCode())) {
+        if (!code.trim().equals(tenant.getVerificationCode())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid verification code");
         }
         tenant.setEmailVerified(true);
         tenant.setDailyRequestLimit(1000);
         tenantRepository.save(tenant);
+        log.info("Tenant {} ({}) successfully verified with OTP. Limit upgraded to 1,000 req/day.",
+                tenant.getTenantId(), tenant.getEmail());
+    }
+
+    public void verifyTenant(String tenantId, String code) {
+        verifyTenant(tenantId, null, code);
+    }
+
+    /**
+     * Resends a fresh 6-digit OTP code to the tenant's email.
+     */
+    public void resendVerificationCode(String tenantId, String email) {
+        Tenant tenant = null;
+        if (tenantId != null && !tenantId.isBlank()) {
+            tenant = tenantRepository.findById(tenantId).orElse(null);
+        }
+        if (tenant == null && email != null && !email.isBlank()) {
+            tenant = tenantRepository.findByEmail(email.trim()).orElse(null);
+        }
+
+        if (tenant == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Tenant not found");
+        }
+
+        String newVerificationCode = String.format("%06d", new SecureRandom().nextInt(1_000_000));
+        tenant.setVerificationCode(newVerificationCode);
+        tenant.setVerificationCodeExpiresAt(Instant.now().plus(Duration.ofHours(24)));
+        tenantRepository.save(tenant);
+
+        log.info("Resending verification OTP for {}: {}", tenant.getEmail(), newVerificationCode);
+        emailService.sendVerificationCode(tenant.getEmail(), newVerificationCode);
     }
 
 
