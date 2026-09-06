@@ -19,4 +19,4 @@ ENV MKL_NUM_THREADS=1
 
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-Xmx160m", "-Xms32m", "-XX:MaxMetaspaceSize=96m", "-XX:ReservedCodeCacheSize=32m", "-XX:+UseSerialGC", "-Xss256k", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Xmx150m", "-Xms32m", "-XX:MaxMetaspaceSize=160m", "-XX:ReservedCodeCacheSize=32m", "-XX:+UseSerialGC", "-Xss256k", "-jar", "app.jar"]
