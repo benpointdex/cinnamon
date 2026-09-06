@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+:root {
+  --c-primary: #0D8D9C;
+  --c-secondary: #E0447D;
+  --c-tertiary: #D9D2BF;
+  --c-neutral: #171512;
+  --c-paper: #F1ECE0;
+  --c-paper-light: #FAF6EE;
+  --c-text-primary: #171512;
+  --c-text-secondary: #6F6A5B;
+  --c-border: #171512;
+}
+
+body {
+  background-color: var(--c-paper);
+  color: var(--c-neutral);
+  font-family: var(--font-inter), sans-serif;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Print registration crosshairs and pluses */
+.reg-mark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-neutral);
+  user-select: none;
+}
+
+.reg-target {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 0.8px solid var(--c-neutral);
+  position: relative;
+  display: inline-block;
+}
+
+.reg-target::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: 50%;
+  width: 0.8px;
+  background: var(--c-neutral);
+  transform: translateX(-50%);
+}
+
+.reg-target::after {
+  content: '';
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  top: 50%;
+  height: 0.8px;
+  background: var(--c-neutral);
+  transform: translateY(-50%);
+}
+
+/* Hairline borders matching Gable & Reed specification */
+.border-ink {
+  border: 0.8px solid var(--c-neutral);
+}
+
+.border-ink-dashed {
+  border: 0.8px dashed rgba(23, 21, 18, 0.35);
+}
+
+.border-ink-t {
+  border-top: 0.8px solid var(--c-neutral);
+}
+
+.border-ink-b {
+  border-bottom: 0.8px solid var(--c-neutral);
+}
+
+.border-ink-l {
+  border-left: 0.8px solid var(--c-neutral);
+}
+
+.border-ink-r {
+  border-right: 0.8px solid var(--c-neutral);
+}
+
+/* Custom button styles from the hero screenshot */
+.btn-primary-riso {
+  background-color: var(--c-secondary);
+  color: #FFFFFF;
+  font-family: var(--font-inter), sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 16px 28px;
+  border-radius: 0px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-primary-riso:hover {
+  background-color: #c73467;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(224, 68, 125, 0.35);
+}
+
+.btn-secondary-riso {
+  background-color: var(--c-paper);
+  color: var(--c-neutral);
+  font-family: var(--font-inter), sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 16px 28px;
+  border-radius: 0px;
+  border: 0.8px solid var(--c-neutral);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-secondary-riso:hover {
+  background-color: #E6DFC9;
+  border-color: var(--c-neutral);
+  transform: translateY(-1px);
+}
+
+/* Risograph paper texture subtle overlay */
+.paper-texture {
+  background-image: radial-gradient(rgba(23, 21, 18, 0.04) 1px, transparent 0);
+  background-size: 24px 24px;
+}
