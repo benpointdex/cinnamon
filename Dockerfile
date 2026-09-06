@@ -14,7 +14,9 @@ COPY target/cinnamon-*.jar app.jar
 # Point Spring AI to the pre-bundled local files
 ENV SPRING_AI_EMBEDDING_TRANSFORMER_ONNX_MODEL_URI=file:/app/onnx/model.onnx
 ENV SPRING_AI_EMBEDDING_TRANSFORMER_TOKENIZER_URI=file:/app/onnx/tokenizer.json
+ENV OMP_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
 
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-Xmx250m", "-Xms64m", "-XX:+UseSerialGC", "-Xss256k", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Xmx160m", "-Xms32m", "-XX:MaxMetaspaceSize=96m", "-XX:ReservedCodeCacheSize=32m", "-XX:+UseSerialGC", "-Xss256k", "-jar", "app.jar"]
