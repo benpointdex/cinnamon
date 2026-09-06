@@ -53,9 +53,10 @@ spring:
             enable: true
             required: true
 
-resend:
-  api-key: ${RESEND_API_KEY:}
-  from-email: ${RESEND_FROM_EMAIL:Cinnamon <onboarding@resend.dev>}
+brevo:
+  api-key: ${BREVO_API_KEY:}
+  sender-email: ${BREVO_SENDER_EMAIL:test.experiment.404@gmail.com}
+  sender-name: ${BREVO_SENDER_NAME:Cinnamon}
 
 
 management:
