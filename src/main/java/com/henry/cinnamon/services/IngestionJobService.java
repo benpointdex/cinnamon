@@ -175,7 +175,7 @@ public class IngestionJobService {
         // Batch matrix inference via Spring AI ONNX Transformers
         Timer.Sample embSample = Timer.start(meterRegistry);
         List<float[]> vectors = embeddingModel.embed(normalizedTexts);
-        embSample.stop(meterRegistry.timer("dejacode.embedding.batch.duration", "batch_size", String.valueOf(units.size())));
+        embSample.stop(meterRegistry.timer("cinnamon.embedding.batch.duration", "batch_size", String.valueOf(units.size())));
 
         for (int i = 0; i < units.size(); i++) {
             if (i < vectors.size()) {

@@ -1,6 +1,6 @@
 package com.henry.cinnamon.config;
 
-import com.henry.cinnamon.services.DejaCodeMcpTools;
+import com.henry.cinnamon.services.CinnamonMcpTools;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.context.annotation.Bean;
@@ -10,9 +10,9 @@ import org.springframework.context.annotation.Configuration;
 public class McpConfig {
 
     @Bean
-    public ToolCallbackProvider dejaCodeTools(DejaCodeMcpTools dejaCodeMcpTools) {
+    public ToolCallbackProvider cinnamonTools(CinnamonMcpTools cinnamonMcpTools) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(dejaCodeMcpTools)
+                .toolObjects(cinnamonMcpTools)
                 .build();
     }
 }

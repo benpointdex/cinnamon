@@ -162,14 +162,14 @@ export default function ShaderHeroBackground() {
     window.addEventListener("pointermove", handlePointerMove);
     handleResize();
 
-    const clock = new THREE.Clock();
+    const startTime = performance.now();
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
       mouse.lerp(targetMouse, 0.05);
       material.uniforms.uTime.value = prefersReducedMotion
         ? 0
-        : clock.getElapsedTime();
+        : (performance.now() - startTime) * 0.001;
       material.uniforms.uMouse.value.copy(mouse);
       renderer.render(scene, camera);
     };

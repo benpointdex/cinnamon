@@ -66,7 +66,7 @@ public class DuplicateDetectionCascade {
             if (probe.getEmbedding() == null) {
                 Timer.Sample embSample = Timer.start(meterRegistry);
                 float[] vector = embeddingModel.embed(probe.getNormalizedText());
-                embSample.stop(meterRegistry.timer("dejacode.embedding.batch.duration", "batch_size", "1"));
+                embSample.stop(meterRegistry.timer("cinnamon.embedding.batch.duration", "batch_size", "1"));
                 probe.setEmbedding(vector);
             }
 
@@ -84,7 +84,7 @@ public class DuplicateDetectionCascade {
                 // Return gracefully if table is empty or pgvector query returns zero rows
                 return DetectionResult.noMatch();
             } finally {
-                searchSample.stop(meterRegistry.timer("dejacode.db.vector.search.duration", "type", "nearest_neighbor"));
+                searchSample.stop(meterRegistry.timer("cinnamon.db.vector.search.duration", "type", "nearest_neighbor"));
             }
 
             if (nearestNeighbors == null || nearestNeighbors.isEmpty()) {

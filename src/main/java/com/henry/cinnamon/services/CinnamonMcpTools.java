@@ -19,7 +19,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 @Service
-public class DejaCodeMcpTools {
+public class CinnamonMcpTools {
 
     private final FunctionExtractor functionExtractor;
     private final DuplicateDetectionCascade cascade;
@@ -31,7 +31,7 @@ public class DejaCodeMcpTools {
     private final MeterRegistry meterRegistry;
 
     @Autowired
-    public DejaCodeMcpTools(FunctionExtractor functionExtractor,
+    public CinnamonMcpTools(FunctionExtractor functionExtractor,
                             DuplicateDetectionCascade cascade,
                             IngestionJobService ingestionJobService,
                             DuplicateFindingRepository findingRepository,
@@ -49,7 +49,7 @@ public class DejaCodeMcpTools {
         this.meterRegistry = meterRegistry != null ? meterRegistry : new SimpleMeterRegistry();
     }
 
-    public DejaCodeMcpTools(FunctionExtractor functionExtractor,
+    public CinnamonMcpTools(FunctionExtractor functionExtractor,
                             DuplicateDetectionCascade cascade,
                             IngestionJobService ingestionJobService,
                             DuplicateFindingRepository findingRepository,
@@ -63,12 +63,12 @@ public class DejaCodeMcpTools {
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
             T result = action.get();
-            sample.stop(meterRegistry.timer("dejacode.mcp.tool.duration", "tool", toolName, "status", "success"));
-            meterRegistry.counter("dejacode.mcp.tool.calls.total", "tool", toolName, "status", "success").increment();
+            sample.stop(meterRegistry.timer("cinnamon.mcp.tool.duration", "tool", toolName, "status", "success"));
+            meterRegistry.counter("cinnamon.mcp.tool.calls.total", "tool", toolName, "status", "success").increment();
             return result;
         } catch (Exception e) {
-            sample.stop(meterRegistry.timer("dejacode.mcp.tool.duration", "tool", toolName, "status", "error"));
-            meterRegistry.counter("dejacode.mcp.tool.calls.total", "tool", toolName, "status", "error").increment();
+            sample.stop(meterRegistry.timer("cinnamon.mcp.tool.duration", "tool", toolName, "status", "error"));
+            meterRegistry.counter("cinnamon.mcp.tool.calls.total", "tool", toolName, "status", "error").increment();
             throw e;
         }
     }
@@ -137,13 +137,13 @@ public class DejaCodeMcpTools {
     }
 
     /**
-     * Tool 3: ingest_github_repository (NEW)
+     * Tool 3: ingest_github_repository
      * Performs a one-click shallow Git clone, smart filtering, and vector indexing directly on the server.
      */
     @Tool(description = "Clones and indexes an entire public or private GitHub repository directly on the server in one click with zero code transferred over MCP. For private repos, provide githubToken (which can be obtained by running 'gh auth token' or a GitHub PAT).")
     public IngestJobHandle ingestGithubRepository(
             @ToolParam(description = "Git repository HTTPS or SSH clone URL (e.g. https://github.com/my-org/my-repo)") String repoUrl,
-            @ToolParam(description = "Target repository name in DejaCode (defaults to repository name extracted from URL)", required = false) String repository,
+            @ToolParam(description = "Target repository name in Cinnamon (defaults to repository name extracted from URL)", required = false) String repository,
             @ToolParam(description = "Branch name (defaults to 'main')", required = false) String branch,
             @ToolParam(description = "GitHub Access Token for private repositories (can be obtained via 'gh auth token' or a GitHub PAT)", required = false) String githubToken,
             @ToolParam(description = "Optional list of source folders to restrict scanning to e.g. ['src', 'lib']", required = false) List<String> sourceDirs) {
@@ -166,7 +166,7 @@ public class DejaCodeMcpTools {
      * Tool 4: ingest_files
      * Starts asynchronous background indexing of a list of files.
      */
-    @Tool(description = "Starts indexing a list of files into DejaCode. Handles payloads with internal auto-partitioning. Returns immediately with a job ID.")
+    @Tool(description = "Starts indexing a list of files into Cinnamon. Handles payloads with internal auto-partitioning. Returns immediately with a job ID.")
     public IngestJobHandle ingestFiles(
             @ToolParam(description = "Repository name e.g. 'cinnamon'") String repository,
             @ToolParam(description = "List of file paths and their contents") List<FileInput> files) {
