@@ -35,7 +35,7 @@ spring:
     # 2. Spring AI MCP Server Configuration
     mcp:
       server:
-        name: dejacode
+        name: cinnamon
         version: 1.0.0
         protocol: STREAMABLE
 

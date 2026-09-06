@@ -46,7 +46,7 @@ public class DuplicateClusterScanner {
             pairs = codeUnitRepository.scanRepositoryDuplicates(
                     tenantId, repository, threshold, prefix, maxResults);
         } finally {
-            dbSample.stop(meterRegistry.timer("dejacode.db.vector.search.duration", "type", "self_join"));
+            dbSample.stop(meterRegistry.timer("cinnamon.db.vector.search.duration", "type", "self_join"));
         }
 
         if (pairs == null || pairs.isEmpty()) {

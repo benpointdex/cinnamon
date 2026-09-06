@@ -64,7 +64,7 @@ public class FunctionExtractor {
             walk(tree.getRootNode(), sourceCode, filePath, repository, lang, units);
             if (!units.isEmpty()) {
                 String langName = lang.getClass().getSimpleName().replace("LanguageAdapter", "").toLowerCase();
-                meterRegistry.counter("dejacode.parser.functions.extracted", "language", langName).increment(units.size());
+                meterRegistry.counter("cinnamon.parser.functions.extracted", "language", langName).increment(units.size());
             }
             return units;
         } catch (Exception e) {

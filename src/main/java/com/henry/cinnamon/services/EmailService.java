@@ -101,7 +101,7 @@ public class EmailService {
                     : "Cinnamon";
 
             String textContent = String.format(
-                    "Welcome to Cinnamon!\\n\\nYour account verification code is:\\n\\n%s\\n\\nThis code will expire in 24 hours. Once verified, your daily request limit will be upgraded from 50 to 1,000 requests/day.\\n\\nHappy coding,\\nThe Cinnamon Team",
+                    "Welcome to Cinnamon!\n\nYour account verification code is:\n\n%s\n\nThis code will expire in 24 hours. Once verified, your daily request limit will be upgraded from 50 to 1,000 requests/day.\n\nHappy coding,\nThe Cinnamon Team",
                     verificationCode
             );
 
@@ -140,7 +140,7 @@ public class EmailService {
                 escapeJson(senderEmail),
                 escapeJson(toEmail),
                 verificationCode,
-                textContent,
+                escapeJson(textContent),
                 escapeJson(htmlContent)
             );
 

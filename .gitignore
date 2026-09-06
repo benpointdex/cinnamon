@@ -41,3 +41,5 @@ prometheus.yml
 **/node_modules/
 **/.next/
 **/.env*
+hs_err_*.log
+replay_*.log

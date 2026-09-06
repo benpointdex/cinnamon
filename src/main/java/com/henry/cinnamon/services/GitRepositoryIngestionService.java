@@ -97,7 +97,7 @@ public class GitRepositoryIngestionService {
             MDC.put("tenantId", tenantId);
             MDC.put("repo", repository);
 
-            tempDir = Files.createTempDirectory("dejacode-git-");
+            tempDir = Files.createTempDirectory("cinnamon-git-");
             String normalizedUrl = normalizeGitUrl(repoUrl);
 
             log.info("Starting shallow Git clone for {} into temporary directory {}", normalizedUrl, tempDir);
@@ -285,7 +285,7 @@ public class GitRepositoryIngestionService {
         // Batched SIMD Matrix inference via Spring AI ONNX Transformers
         Timer.Sample embSample = Timer.start(meterRegistry);
         List<float[]> vectors = embeddingModel.embed(normalizedTexts);
-        embSample.stop(meterRegistry.timer("dejacode.embedding.batch.duration", "batch_size", String.valueOf(units.size())));
+        embSample.stop(meterRegistry.timer("cinnamon.embedding.batch.duration", "batch_size", String.valueOf(units.size())));
 
         for (int i = 0; i < units.size(); i++) {
             if (i < vectors.size()) {
