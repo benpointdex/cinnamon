@@ -26,11 +26,15 @@ public class EmailService {
     @Value("${spring.mail.username:}")
     private String fromEmail;
 
-    @Value("${resend.api-key:${RESEND_API_KEY:}}")
-    private String resendApiKey;
+    // Brevo HTTPS API configuration
+    @Value("${brevo.api-key:${BREVO_API_KEY:}}")
+    private String brevoApiKey;
 
-    @Value("${resend.from-email:${RESEND_FROM_EMAIL:Cinnamon <onboarding@resend.dev>}}")
-    private String resendFromEmail;
+    @Value("${brevo.sender-email:${BREVO_SENDER_EMAIL:test.experiment.404@gmail.com}}")
+    private String brevoSenderEmail;
+
+    @Value("${brevo.sender-name:${BREVO_SENDER_NAME:Cinnamon}}")
+    private String brevoSenderName;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -38,19 +42,22 @@ public class EmailService {
 
     /**
      * Sends the 6-digit OTP verification code asynchronously.
-     * Tries Resend HTTPS API (port 443) first, then falls back to SMTP, then to console.
+     * Order of precedence:
+     * 1. Brevo HTTPS API (port 443, sends to ANY recipient with free tier)
+     * 2. Standard JavaMail SMTP (port 587, local dev fallback)
+     * 3. Console log fallback
      */
     @Async
     public void sendVerificationCode(String toEmail, String verificationCode) {
-        // 1. Primary for Cloud / Render: Resend HTTPS API (Port 443 is never blocked by cloud firewalls)
-        if (resendApiKey != null && !resendApiKey.isBlank()) {
-            if (sendViaResendApi(toEmail, verificationCode)) {
+        // 1. Primary: Brevo HTTPS API (Port 443, sends to any recipient)
+        if (brevoApiKey != null && !brevoApiKey.isBlank()) {
+            if (sendViaBrevoApi(toEmail, verificationCode)) {
                 return;
             }
-            log.warn("Resend dispatch failed. Attempting SMTP fallback for {}...", toEmail);
+            log.warn("Brevo dispatch failed for {}. Trying SMTP fallback...", toEmail);
         }
 
-        // 2. Secondary: Standard JavaMail SMTP (e.g. for local dev or paid hosting where port 587 is unblocked)
+        // 2. Secondary: Standard JavaMail SMTP
         if (mailSender != null && fromEmail != null && !fromEmail.isBlank()) {
             try {
                 SimpleMailMessage message = new SimpleMailMessage();
@@ -81,48 +88,82 @@ public class EmailService {
         }
 
         // 3. Fallback: Log OTP in console
-        log.warn("⚠No active email provider succeeded. Fallback OTP code for {}: {}", toEmail, verificationCode);
+        log.warn("⚠No email provider succeeded. Fallback OTP code for {}: {}", toEmail, verificationCode);
     }
 
-    private boolean sendViaResendApi(String toEmail, String verificationCode) {
+    private boolean sendViaBrevoApi(String toEmail, String verificationCode) {
         try {
-            String from = (resendFromEmail != null && !resendFromEmail.isBlank())
-                    ? resendFromEmail.trim()
-                    : "Cinnamon <onboarding@resend.dev>";
+            String senderEmail = (brevoSenderEmail != null && !brevoSenderEmail.isBlank())
+                    ? brevoSenderEmail.trim()
+                    : "test.experiment.404@gmail.com";
+            String senderName = (brevoSenderName != null && !brevoSenderName.isBlank())
+                    ? brevoSenderName.trim()
+                    : "Cinnamon";
 
-            String bodyText = String.format(
+            String textContent = String.format(
                     "Welcome to Cinnamon!\\n\\nYour account verification code is:\\n\\n%s\\n\\nThis code will expire in 24 hours. Once verified, your daily request limit will be upgraded from 50 to 1,000 requests/day.\\n\\nHappy coding,\\nThe Cinnamon Team",
+                    verificationCode
+            );
+
+            String htmlContent = String.format(
+                    "<div style='font-family: monospace; padding: 24px; background-color: #FAF6EE; color: #171512; border: 1px solid #171512; max-width: 520px;'>"
+                    + "<div style='display: flex; align-items: center; margin-bottom: 12px;'>"
+                    + "<span style='color: #E0447D; font-weight: bold; font-size: 11px; letter-spacing: 2px;'>CINNAMON · ACCESS VERIFICATION</span>"
+                    + "</div>"
+                    + "<h2 style='font-size: 20px; color: #171512; margin-top: 0;'>Your Developer OTP Code</h2>"
+                    + "<p style='color: #6F6A5B; font-size: 13px; line-height: 1.5;'>Enter this 6-digit code in your Cinnamon Developer portal to unlock 1,000 requests/day:</p>"
+                    + "<div style='font-size: 32px; font-weight: bold; letter-spacing: 6px; padding: 14px 28px; background: #171512; color: #0D8D9C; display: inline-block; margin: 16px 0;'>%s</div>"
+                    + "<p style='color: #6F6A5B; font-size: 11px; margin-top: 16px;'>This code will expire in 24 hours. If you did not request this, please ignore this email.</p>"
+                    + "<hr style='border: none; border-top: 0.8px solid #171512; opacity: 0.2; margin: 20px 0;' />"
+                    + "<span style='font-size: 10px; color: #6F6A5B; letter-spacing: 1px;'>CINNAMON · TWO PLATES ONLY · 2026</span>"
+                    + "</div>",
                     verificationCode
             );
 
             String jsonPayload = String.format("""
                 {
-                    "from": "%s",
-                    "to": ["%s"],
-                    "subject": "Verify your Cinnamon Account",
-                    "text": "%s"
+                    "sender": {
+                        "name": "%s",
+                        "email": "%s"
+                    },
+                    "to": [
+                        {
+                            "email": "%s"
+                        }
+                    ],
+                    "subject": "Your Cinnamon Verification Code: %s",
+                    "textContent": "%s",
+                    "htmlContent": "%s"
                 }
-                """, escapeJson(from), escapeJson(toEmail), bodyText);
+                """,
+                escapeJson(senderName),
+                escapeJson(senderEmail),
+                escapeJson(toEmail),
+                verificationCode,
+                textContent,
+                escapeJson(htmlContent)
+            );
 
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create("https://api.resend.com/emails"))
+                    .uri(URI.create("https://api.brevo.com/v3/smtp/email"))
                     .timeout(Duration.ofSeconds(15))
-                    .header("Authorization", "Bearer " + resendApiKey.trim())
+                    .header("api-key", brevoApiKey.trim())
                     .header("Content-Type", "application/json")
+                    .header("accept", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                     .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                log.info("Verification email sent successfully via Resend HTTPS API to {}. Response: {}", toEmail, response.body());
+                log.info("Verification email sent successfully via Brevo HTTPS API to {}. Response: {}", toEmail, response.body());
                 return true;
             } else {
-                log.error("Resend API error HTTP {}: {}", response.statusCode(), response.body());
+                log.error("Brevo API error HTTP {}: {}", response.statusCode(), response.body());
                 return false;
             }
         } catch (Exception e) {
-            log.error("Exception during Resend API dispatch for {}: {}", toEmail, e.getMessage(), e);
+            log.error("Exception during Brevo API dispatch for {}: {}", toEmail, e.getMessage(), e);
             return false;
         }
     }
