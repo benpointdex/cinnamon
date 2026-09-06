@@ -28,7 +28,7 @@ import java.util.UUID;
 public class IngestionJobService {
 
     private static final Logger log = LoggerFactory.getLogger(IngestionJobService.class);
-    private static final int BATCH_SIZE = 50;
+    private static final int BATCH_SIZE = 25;
 
     private final FunctionExtractor functionExtractor;
     private final SourceFileFilter sourceFileFilter;
@@ -148,8 +148,8 @@ public class IngestionJobService {
 
             job.setStatus("COMPLETED");
             job.setCompletedAt(Instant.now());
-        } catch (Exception e) {
-            log.error("Error during ingestion job {}", jobId, e);
+        } catch (Throwable t) {
+            log.error("Error during ingestion job {}", jobId, t);
             job.setStatus("FAILED");
         } finally {
             try {
