@@ -89,8 +89,8 @@ export default function HeroSection({ onOpenModal }: HeroSectionProps) {
               lineHeight: "24px",
             }}
           >
-            We detect duplicate code before it runs because a third helper
-            function has never once paid for itself.
+            Cinnamon scans your repository in real time to catch repeated
+            functions before they become technical debt.
           </p>
         </div>
 
