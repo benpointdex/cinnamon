@@ -34,7 +34,7 @@ import java.util.*;
 public class GitRepositoryIngestionService {
 
     private static final Logger log = LoggerFactory.getLogger(GitRepositoryIngestionService.class);
-    private static final int BATCH_SIZE = 50;
+    private static final int BATCH_SIZE = 25;
     private static final int CLONE_TIMEOUT_SECONDS = 60;
 
     private final SourceFileFilter sourceFileFilter;
@@ -232,8 +232,8 @@ public class GitRepositoryIngestionService {
         } catch (TransportException te) {
             log.error("Authentication or network error while cloning private repository {}: {}", repoUrl, te.getMessage());
             job.setStatus("FAILED");
-        } catch (Exception e) {
-            log.error("Fatal error during Git-native ingestion for repo {}", repoUrl, e);
+        } catch (Throwable t) {
+            log.error("Fatal error during Git-native ingestion for repo {}", repoUrl, t);
             job.setStatus("FAILED");
         } finally {
             try {
