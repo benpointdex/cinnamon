@@ -115,7 +115,7 @@ public class EmailService {
                     + "<div style='font-size: 32px; font-weight: bold; letter-spacing: 6px; padding: 14px 28px; background: #171512; color: #0D8D9C; display: inline-block; margin: 16px 0;'>%s</div>"
                     + "<p style='color: #6F6A5B; font-size: 11px; margin-top: 16px;'>This code will expire in 24 hours. If you did not request this, please ignore this email.</p>"
                     + "<hr style='border: none; border-top: 0.8px solid #171512; opacity: 0.2; margin: 20px 0;' />"
-                    + "<span style='font-size: 10px; color: #6F6A5B; letter-spacing: 1px;'>CINNAMON · TWO PLATES ONLY · 2026</span>"
+                    + "<span style='font-size: 10px; color: #6F6A5B; letter-spacing: 1px;'>CINNAMON · 2026</span>"
                     + "</div>",
                     verificationCode
             );

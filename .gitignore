@@ -36,3 +36,8 @@ build/
 
 # Local monitoring configs & secrets
 prometheus.yml
+
+# Frontend client
+**/node_modules/
+**/.next/
+**/.env*
