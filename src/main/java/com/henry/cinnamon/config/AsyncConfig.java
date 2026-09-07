@@ -19,12 +19,12 @@ public class AsyncConfig {
 
     public Executor ingestionExecutor( ){
 
-        int cores = Runtime.getRuntime().availableProcessors();
+        // Cap to 1 thread to prevent concurrent ingestion OOM on memory-constrained deployments (e.g. Render 512MB)
 
         ThreadPoolTaskExecutor threadPoolTaskExecutor = new ThreadPoolTaskExecutor();
-        threadPoolTaskExecutor.setCorePoolSize(cores);
-        threadPoolTaskExecutor.setMaxPoolSize(cores*2);
-        threadPoolTaskExecutor.setQueueCapacity(500);
+        threadPoolTaskExecutor.setCorePoolSize(1);
+        threadPoolTaskExecutor.setMaxPoolSize(1);
+        threadPoolTaskExecutor.setQueueCapacity(10);
         threadPoolTaskExecutor.setThreadNamePrefix("ingest-worker-");
         threadPoolTaskExecutor.initialize();
         return threadPoolTaskExecutor;

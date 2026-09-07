@@ -16,7 +16,8 @@ ENV SPRING_AI_EMBEDDING_TRANSFORMER_ONNX_MODEL_URI=file:/app/onnx/model.onnx
 ENV SPRING_AI_EMBEDDING_TRANSFORMER_TOKENIZER_URI=file:/app/onnx/tokenizer.json
 ENV OMP_NUM_THREADS=1
 ENV MKL_NUM_THREADS=1
+ENV ORT_GLOBAL_THREAD_POOL_SIZE=1
 
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-Xmx150m", "-Xms32m", "-XX:MaxMetaspaceSize=160m", "-XX:ReservedCodeCacheSize=32m", "-XX:+UseSerialGC", "-Xss256k", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Xmx180m", "-Xms64m", "-XX:MaxMetaspaceSize=128m", "-XX:ReservedCodeCacheSize=32m", "-XX:+UseSerialGC", "-Xss256k", "-XX:MaxDirectMemorySize=48m", "-jar", "app.jar"]
