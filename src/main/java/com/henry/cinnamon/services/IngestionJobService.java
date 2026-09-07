@@ -28,7 +28,7 @@ import java.util.UUID;
 public class IngestionJobService {
 
     private static final Logger log = LoggerFactory.getLogger(IngestionJobService.class);
-    private static final int BATCH_SIZE = 25;
+    private static final int BATCH_SIZE = 8;
 
     private final FunctionExtractor functionExtractor;
     private final SourceFileFilter sourceFileFilter;
@@ -127,6 +127,7 @@ public class IngestionJobService {
                     embedAndSaveBatch(pendingBatch);
                     indexedCount += pendingBatch.size();
                     pendingBatch.clear();
+                    System.gc(); // Hint JVM to reclaim native ONNX tensor memory between batches
 
                     // Update live progress in DB
                     job.setProcessedFiles(processedFilesCount);

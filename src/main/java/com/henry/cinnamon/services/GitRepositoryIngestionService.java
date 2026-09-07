@@ -34,7 +34,7 @@ import java.util.*;
 public class GitRepositoryIngestionService {
 
     private static final Logger log = LoggerFactory.getLogger(GitRepositoryIngestionService.class);
-    private static final int BATCH_SIZE = 25;
+    private static final int BATCH_SIZE = 8;
     private static final int CLONE_TIMEOUT_SECONDS = 60;
 
     private final SourceFileFilter sourceFileFilter;
@@ -206,6 +206,7 @@ public class GitRepositoryIngestionService {
                     embedAndSaveBatch(pendingBatch);
                     indexedFunctions += pendingBatch.size();
                     pendingBatch.clear();
+                    System.gc(); // Hint JVM to reclaim native ONNX tensor memory between batches
 
                     // Update live progress in DB
                     job.setProcessedFiles(processedFiles);
